@@ -58,8 +58,7 @@ class FaissJsonRetriever(BiomedicalRetriever):
             for distances_row, indices_row in zip(D, I):
                 for dist, idx in zip(distances_row, indices_row):
                     doc_text = articles_list[idx] if isinstance(articles_list[idx], str) else articles_list[idx].get("text", "")
-                    title = articles_list[idx].get("title", "") if isinstance(articles_list[idx], dict) else ""
-                    all_results.append((dist, Document(page_content=doc_text, metadata={"title": title, "corpus": corpus})))
+                    all_results.append((dist, Document(page_content=doc_text, metadata={"corpus": corpus})))
 
         # Rerank top-k globally by score
         all_results.sort(key=lambda x: x[0], reverse=True)
