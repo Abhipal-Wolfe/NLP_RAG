@@ -22,7 +22,7 @@ class BiomedicalRetriever(ABC):
     """Base retriever interface"""
     
     @abstractmethod
-    def retrieve(self, query: str, k: int = 5, **kwargs) -> RetrievalResult:
+    def retrieve(self, query, k: int = 5, **kwargs) -> RetrievalResult:
         """Retrieve top-k documents for query"""
         pass
 
@@ -31,20 +31,29 @@ class FaissJsonRetriever(BiomedicalRetriever):
     """
     Retriever that uses FAISS index + articles JSON.
     Supports multiple corpora and reranking top-k.
+    
+    Expects query_embedding as input (use query_encode to generate embeddings).
     """
     
     def __init__(self, faiss_index_paths: Dict[str, str], articles_paths: Dict[str, str]):
         """
-        faiss_index_paths: {"pubmed": "path/to/index.faiss", ...}
-        articles_paths: {"pubmed": "path/to/articles.json", ...}
+        Args:
+            faiss_index_paths: {"pubmed": "path/to/index.faiss", ...}
+            articles_paths: {"pubmed": "path/to/articles.json", ...}
         """
         self.indices = {k: faiss.read_index(v) for k, v in faiss_index_paths.items()}
         self.articles = {k: json.load(open(v, 'r', encoding='utf-8')) for k, v in articles_paths.items()}
 
     def retrieve(self, query_embedding: np.ndarray, k: int = 5) -> RetrievalResult:
         """
-        query_embedding: np.array of shape (1, dim) or (num_queries, dim)
-        Returns top-k results across all corpora.
+        Retrieve documents using FAISS search.
+        
+        Args:
+            query_embedding: np.array of shape (1, dim) or (num_queries, dim)
+            k: Number of documents to retrieve
+            
+        Returns:
+            RetrievalResult with top-k documents across all corpora
         """
         query_embedding = query_embedding.astype(np.float32)
         all_results = []
@@ -53,19 +62,28 @@ class FaissJsonRetriever(BiomedicalRetriever):
         for corpus, index in self.indices.items():
             D, I = index.search(query_embedding, k)  # distances and indices
             articles_list = self.articles[corpus]
+            articles_len = len(articles_list)
             
             # Map indices to articles
             for distances_row, indices_row in zip(D, I):
                 for dist, idx in zip(distances_row, indices_row):
+                    # Skip invalid indices (out of bounds)
+                    if idx >= articles_len or idx < 0:
+                        continue
+                    
                     doc_text = articles_list[idx] if isinstance(articles_list[idx], str) else articles_list[idx].get("text", "")
-                    all_results.append((dist, Document(page_content=doc_text, metadata={"corpus": corpus})))
+                    all_results.append((dist, Document(page_content=doc_text, metadata={"corpus": corpus, "doc_id": int(idx)})))
 
         # Rerank top-k globally by score
         all_results.sort(key=lambda x: x[0], reverse=True)
         top_results = all_results[:k]
-        docs, scores = zip(*top_results) if top_results else ([], [])
-        return RetrievalResult(documents=list(docs), scores=list(scores), metadata={"num_candidates": len(all_results)})    
-                                                                                                          
+        if top_results:
+            # Unpack: (distance, Document) tuples
+            # zip(*top_results) gives (distances_tuple, documents_tuple)
+            scores, docs = zip(*top_results)
+        else:
+            scores, docs = [], []
+        return RetrievalResult(documents=list(docs), scores=list(scores), metadata={"num_candidates": len(all_results)})
 
 
 class VectorStoreRetriever(BiomedicalRetriever):

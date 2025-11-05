@@ -25,10 +25,12 @@ except ImportError:
     pass  # dotenv not required, env vars can be set manually
 
 # Import all chains
-from .chains.baseline_chain import BaselineChain, BaselineConfig
-from .chains.basic_rag_chain import BasicRAGChain, BasicRAGConfig
-from .chains.selfbiorag_chain import SelfBioRAGChain, SelfBioRAGConfig
-from .infrastructure.utils import load_jsonl, save_jsonl
+from src.chains.baseline_chain import BaselineChain, BaselineConfig
+from src.chains.basic_rag_chain import BasicRAGChain, BasicRAGConfig
+from src.chains.selfbiorag_chain import SelfBioRAGChain, SelfBioRAGConfig
+from src.infrastructure.utils import load_jsonl, load_reflection_tokens
+from src.retriever_models import FaissJsonRetriever
+from src.generator_models import GeneratorModel
 
 
 def run_chain(
@@ -71,11 +73,74 @@ def run_chain(
         config = BaselineConfig(**config_kwargs)
         chain = BaselineChain(config)
     elif chain_type == "basic_rag":
+        # Extract FAISS paths
+        faiss_index_paths = config_kwargs.pop("faiss_index_paths", {
+            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
+            "pmc": "indexes_and_articles/PMC/PMC_Total_Index.faiss",
+            "cpg": "indexes_and_articles/CPG/CPG_Total_Index.faiss",
+            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
+        })
+        articles_paths = config_kwargs.pop("articles_paths", {
+            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
+            "pmc": "indexes_and_articles/PMC/PMC_Total_Articles.json",
+            "cpg": "indexes_and_articles/CPG/CPG_Total_Articles.json",
+            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Articles.json"
+        })
+        
+        # Create retriever
+        retriever = FaissJsonRetriever(faiss_index_paths, articles_paths)
+        
         config = BasicRAGConfig(**config_kwargs)
-        chain = BasicRAGChain(config)
+        chain = BasicRAGChain(config=config, retriever=retriever)
     elif chain_type == "selfbiorag":
+        # Extract FAISS paths (same as basic_rag)
+        faiss_index_paths = config_kwargs.pop("faiss_index_paths", {
+            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
+            "pmc": "indexes_and_articles/PMC/PMC_Total_Index.faiss",
+            "cpg": "indexes_and_articles/CPG/CPG_Total_Index.faiss",
+            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
+        })
+        articles_paths = config_kwargs.pop("articles_paths", {
+            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
+            "pmc": "indexes_and_articles/PMC/PMC_Total_Articles.json",
+            "cpg": "indexes_and_articles/CPG/CPG_Total_Articles.json",
+            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Articles.json"
+        })
+        
+        # Create config
         config = SelfBioRAGConfig(**config_kwargs)
-        chain = SelfBioRAGChain(config)
+        
+        # Create generator model
+        generator = GeneratorModel(
+            model_path=config.model_path,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+            dtype="half",  # Use half precision
+            tensor_parallel_size=1,
+            gpu_memory_utilization=config.gpu_memory_utilization,
+            enforce_eager=True  # Disable CUDA graphs to save memory
+        )
+        
+        # Load reflection tokens
+        ret_tokens, rel_tokens, grd_tokens, ut_tokens = load_reflection_tokens(
+            generator.tokenizer,
+            use_grounding=config.use_groundedness,
+            use_utility=config.use_utility
+        )
+        
+        # Create retriever
+        retriever = FaissJsonRetriever(faiss_index_paths, articles_paths)
+        
+        # Create chain
+        chain = SelfBioRAGChain(
+            retriever=retriever,
+            generator=generator,
+            ret_tokens=ret_tokens,
+            rel_tokens=rel_tokens,
+            grd_tokens=grd_tokens,
+            ut_tokens=ut_tokens,
+            config=config
+        )
     else:
         raise ValueError(f"Unknown chain type: {chain_type}. Choose 'baseline', 'basic_rag', or 'selfbiorag'")
     
@@ -100,17 +165,12 @@ def run_chain(
         "metadata": metadata
     })
     
-    # 5. Save results
-    results_to_save = [result.to_dict() for result in output["results"]]
-    save_jsonl(results_to_save, output_path)
-    
-    # Save summary
+    # 5. Save summary (only metrics, no full predictions)
     summary_path = output_path.replace('.jsonl', '_summary.json')
     summary = {
         "chain_type": chain_type,
         "dataset": dataset_path,
         "num_samples": len(data),
-        "config": config.to_dict() if hasattr(config, 'to_dict') else str(config),
         "metrics": output["metrics"]
     }
     with open(summary_path, 'w') as f:
@@ -118,20 +178,22 @@ def run_chain(
     
     if verbose:
         print(f"\n{'='*80}")
-        print("RESULTS")
+        print("FINAL RESULTS")
         print(f"{'='*80}")
         metrics = output["metrics"]
         
         if "substring_match" in metrics:
-            print(f"\nSubstring Match: {metrics['substring_match']['accuracy']:.2f}%")
+            print(f"\n✓ Substring Match Accuracy: {metrics['substring_match']['accuracy']:.2f}%")
             print(f"  Correct: {metrics['substring_match']['correct']}/{metrics['substring_match']['total']}")
         
         if "exact_match" in metrics:
-            print(f"\nExact Match: {metrics['exact_match']['accuracy']:.2f}%")
+            print(f"\n✓ Exact Match Accuracy: {metrics['exact_match']['accuracy']:.2f}%")
             print(f"  Correct: {metrics['exact_match']['correct']}/{metrics['exact_match']['total']}")
         
-        print(f"\nSaved predictions: {output_path}")
-        print(f"Saved summary: {summary_path}")
+        if "avg_docs_used" in metrics:
+            print(f"\n✓ Average Documents Used: {metrics['avg_docs_used']:.2f}")
+        
+        print(f"\nSummary saved: {summary_path}")
         print()
     
     return output

@@ -57,7 +57,7 @@ def query_encode(input_list):
     queries=[]
 
     splits = [i for i in range(0, len(input_list), 100)]
-    for i in tqdm(splits, desc="query encoding"):
+    for i in tqdm(splits, desc="query encoding", disable=True):
         split_queries = input_list[i:i+100]
         with torch.no_grad():
             encoded = tokenizer(

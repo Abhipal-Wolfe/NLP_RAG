@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+
+# Virtual environment
+venv/
+
+# Data
+data/
+
+# Environment variables
+.env
+
+# original repository
+original_repo/
+
+# indexes and articles
+indexes_and_articles/
