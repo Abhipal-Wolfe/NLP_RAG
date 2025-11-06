@@ -5,17 +5,14 @@ from .retriever import (
     VectorStoreRetriever,
     PreloadedRetriever,
     RetrievalResult,
-    FaissJsonRetriever
+    LiveRetriever
 )
-from .embed_queries import query_preprocess, query_encode
 
 __all__ = [
     "BiomedicalRetriever",
     "VectorStoreRetriever",
     "PreloadedRetriever",
     "RetrievalResult",
-    "FaissJsonRetriever",
-    "query_preprocess",
-    "query_encode"
+    "LiveRetriever"
 ]
 

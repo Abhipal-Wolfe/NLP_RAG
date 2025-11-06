@@ -8,6 +8,16 @@ import json
 import numpy as np
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore
+import os 
+import glob as glob
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sentence_transformers import SentenceTransformer
+import retrieve as rt
+import query_encode as qe
+import rerank as rr
+import gc
+import live_query_encode as lqe
 
 
 @dataclass
@@ -26,64 +36,6 @@ class BiomedicalRetriever(ABC):
         """Retrieve top-k documents for query"""
         pass
 
-
-class FaissJsonRetriever(BiomedicalRetriever):
-    """
-    Retriever that uses FAISS index + articles JSON.
-    Supports multiple corpora and reranking top-k.
-    
-    Expects query_embedding as input (use query_encode to generate embeddings).
-    """
-    
-    def __init__(self, faiss_index_paths: Dict[str, str], articles_paths: Dict[str, str]):
-        """
-        Args:
-            faiss_index_paths: {"pubmed": "path/to/index.faiss", ...}
-            articles_paths: {"pubmed": "path/to/articles.json", ...}
-        """
-        self.indices = {k: faiss.read_index(v) for k, v in faiss_index_paths.items()}
-        self.articles = {k: json.load(open(v, 'r', encoding='utf-8')) for k, v in articles_paths.items()}
-
-    def retrieve(self, query_embedding: np.ndarray, k: int = 5) -> RetrievalResult:
-        """
-        Retrieve documents using FAISS search.
-        
-        Args:
-            query_embedding: np.array of shape (1, dim) or (num_queries, dim)
-            k: Number of documents to retrieve
-            
-        Returns:
-            RetrievalResult with top-k documents across all corpora
-        """
-        query_embedding = query_embedding.astype(np.float32)
-        all_results = []
-
-        # Search each corpus
-        for corpus, index in self.indices.items():
-            D, I = index.search(query_embedding, k)  # distances and indices
-            articles_list = self.articles[corpus]
-            articles_len = len(articles_list)
-            
-            # Map indices to articles
-            for distances_row, indices_row in zip(D, I):
-                for dist, idx in zip(distances_row, indices_row):
-                    # Skip invalid indices (out of bounds)
-                    if idx >= articles_len or idx < 0:
-                        continue
-                    
-                    doc_text = articles_list[idx] if isinstance(articles_list[idx], str) else articles_list[idx].get("text", "")
-                    all_results.append((dist, Document(page_content=doc_text, metadata={"corpus": corpus, "doc_id": int(idx)})))
-
-        # Rerank top-k globally by score
-        all_results.sort(key=lambda x: x[0], reverse=True)
-        top_results = all_results[:k]
-        if top_results:
-            # Unpack: (distance, Document) tuples
-            # zip(*top_results) gives (distances_tuple, documents_tuple)
-            scores, docs = zip(*top_results)
-        else:
-            scores, docs = [], []
-        return RetrievalResult(documents=list(docs), scores=list(scores), metadata={"num_candidates": len(all_results)})
 
 
 class VectorStoreRetriever(BiomedicalRetriever):
@@ -107,43 +59,165 @@ class VectorStoreRetriever(BiomedicalRetriever):
 
 class PreloadedRetriever(BiomedicalRetriever):
     """
-    Retriever for pre-fetched evidence (used in benchmarks).
-    
-    Evidence dict maps query_idx -> {
-        'ctxs': [{'title': str, 'text': str}, ...]  # OR
-        'evidence': [str, ...]  # simpler format
-    }
+    Retriever for prebuilt evidence JSONs (used in benchmarks or evaluation).
+
+    It loads evidence automatically from a precomputed JSON file located in
+    the `outputs/` directory.
+
+    Expected JSON format:
+    [
+        {
+            "query": str,
+            "id" or "query_idx": int,
+            "evidence": [str, ...] or "ctxs": [{"title": str, "text": str}, ...],
+            ...
+        },
+        ...
+    ]
     """
-    
-    def __init__(self, evidence_dict: Dict[int, Dict]):
-        self.evidence_dict = evidence_dict
-    
+
+    def __init__(self, outputs_dir: str = "output", json_pattern: str = "*evidence*.json"):
+        # Automatically find the most recent JSON file
+        json_files = glob.glob(os.path.join(outputs_dir, json_pattern))
+        print(outputs_dir)
+        if not json_files:
+            raise FileNotFoundError(f"No evidence JSON files found in {outputs_dir}")
+        latest_file = max(json_files, key=os.path.getmtime)
+
+        with open(latest_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Build evidence dict: query_idx -> entry
+        self.evidence_dict = {}
+        for item in data:
+            qid = item.get("id", item.get("query_idx"))
+            if qid is not None:
+                self.evidence_dict[qid] = item
+
+        print(f"[PreloadedRetriever] Loaded {len(self.evidence_dict)} entries from {latest_file}")
+
     def retrieve(self, query: str, k: int = 5, query_idx: Optional[int] = None, **kwargs) -> RetrievalResult:
-        """Retrieve from preloaded evidence by query index"""
+        """Retrieve evidence from preloaded JSON using query index"""
         if query_idx is None:
             raise ValueError("query_idx required for PreloadedRetriever")
-        
-        evidence = self.evidence_dict.get(query_idx, {})
-        
-        # Format 1: Structured with title + text
-        if "ctxs" in evidence:
+
+        evidence_entry = self.evidence_dict.get(query_idx, {})
+
+        # Format 1: Structured title + text
+        if "ctxs" in evidence_entry:
             documents = [
                 Document(
-                    page_content=f"{ctx['title']}\n{ctx['text']}" if ctx.get('title') else ctx['text'],
+                    page_content=f"{ctx.get('title', '')}\n{ctx.get('text', '')}".strip(),
                     metadata={"title": ctx.get("title", ""), "source": "preloaded"}
                 )
-                for ctx in evidence["ctxs"][:k]
+                for ctx in evidence_entry["ctxs"][:k]
             ]
-        # Format 2: Plain text list
-        elif "evidence" in evidence:
+        # Format 2: Simple evidence list
+        elif "evidence" in evidence_entry:
             documents = [
                 Document(page_content=text, metadata={"source": "preloaded"})
-                for text in evidence["evidence"][:k]
+                for text in evidence_entry["evidence"][:k]
             ]
         else:
             documents = []
-        
+
+        # Wrap all expected fields into metadata
+        metadata = {
+            "instruction": evidence_entry.get("instruction", ""),
+            "input": evidence_entry.get("input", ""),
+            "output": evidence_entry.get("output", ""),
+            "metadata": evidence_entry.get("metadata", {}),
+            "dataset_name": evidence_entry.get("dataset_name", ""),
+            "topic": evidence_entry.get("topic", ""),
+            "id": evidence_entry.get("id", evidence_entry.get("query_idx")),
+            "evidence": [doc.page_content for doc in documents],  # raw text
+        }
+
         return RetrievalResult(
             documents=documents,
-            metadata={"query_idx": query_idx, "available": len(documents)}
+            metadata=metadata
+        )
+    
+
+class LiveRetriever(BiomedicalRetriever):
+    """
+    Retriever that performs live retrieval + reranking for a single query or batch of queries.
+
+    Outputs a RetrievalResult compatible with PreloadedRetriever.
+    """
+
+    def __init__(
+        self,
+        embeddings_dir: str,
+        articles_dir: str,
+        reranker_type: str = "medcpt",  # 'medcpt' or 'bert'
+        topk: int = 5,
+        device: Optional[str] = None
+    ):
+
+        self.embeddings_dir = embeddings_dir
+        self.articles_dir = articles_dir
+        self.topk = topk
+        self.reranker_type = reranker_type
+
+        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+
+        # Load reranker
+        if reranker_type == "medcpt":
+            self.tokenizer = AutoTokenizer.from_pretrained("ncbi/MedCPT-Cross-Encoder")
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                "ncbi/MedCPT-Cross-Encoder"
+            ).to(self.device).eval()
+        elif reranker_type == "bert":
+            self.model = SentenceTransformer("sentence-transformers/all-distilroberta-v1", device=self.device)
+
+        # Load indexes once
+        self.pubmed_index, self.pubmed_mapping = rt.pubmed_index_create(os.path.join(embeddings_dir, "pubmed"))
+        self.pmc_index, self.pmc_mapping = rt.pmc_index_create(os.path.join(embeddings_dir, "pmc"))
+
+        self.qe = qe
+        self.encoder = lqe.query_encode(device=str(self.device))
+        self.rr = rr
+        self.gc = gc
+        self.torch = torch
+
+    def retrieve(self, query: str, k: Optional[int] = None, **kwargs) -> RetrievalResult:
+        """Retrieve top-k documents for a single query string"""
+        k = k or self.topk
+
+        # qe.query_preprocess(query, use_spacy=False)
+        # Encode query
+        if self.reranker_type == "medcpt":
+            q_emb = self.encoder.encode([query])[0]  # returns a numpy array
+        elif self.reranker_type == "bert":
+            q_emb = self.model.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
+
+        # Retrieve top-k from PubMed & PMC
+        pubmed_topk = self.rr.retrieve_topk(self.pubmed_index, self.pubmed_mapping, [q_emb], topk=k,
+                                            source_dir=self.articles_dir, source_type='pubmed')[0]
+        pmc_topk = self.rr.retrieve_topk(self.pmc_index, self.pmc_mapping, [q_emb], topk=k,
+                                         source_dir=self.articles_dir, source_type='pmc')[0]
+
+        # Combine query + evidence
+        q_pairs, combined_evidence = self.rr.combine_query_evidence([query], [pubmed_topk], [pmc_topk])
+        combined_evidence = combined_evidence[0]
+        q_pairs = q_pairs[0]
+
+        # Rerank
+        if self.reranker_type == "medcpt":
+            reranked = self.rr.rerank([q_pairs], [combined_evidence],
+                                       tokenizer=self.tokenizer, model=self.model, device=self.device)[0]
+        elif self.reranker_type == "bert":
+            reranked = self.rr.rerank_sbert([q_pairs], [combined_evidence],
+                                            sbert_model=self.model, device=self.device, topk=k)[0]
+
+        # Wrap into RetrievalResult
+        documents = [Document(page_content=txt, metadata={"source": "live"}) for txt in reranked[:k]]
+
+        return RetrievalResult(
+            documents=documents,
+            metadata={
+                "query": query,
+                "available": len(documents)
+            }
         )
