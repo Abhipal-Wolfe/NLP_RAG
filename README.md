@@ -1,6 +1,7 @@
-# NLP_RAG
+# NLP_RAG  
 
 Download pre-computed embeddings and article from [Download from Google Drive](https://drive.google.com/file/d/1Wqrv7g-g-c4xXTsg67v0rVOGcBige0_e/view?usp=drive_link)
+
 =======
 # Self-BioRAG Implementation & Evaluation Framework
 
