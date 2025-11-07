@@ -75,16 +75,16 @@ def run_chain(
     elif chain_type == "basic_rag":
         # Extract FAISS paths
         faiss_index_paths = config_kwargs.pop("faiss_index_paths", {
-            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
-            "pmc": "indexes_and_articles/PMC/PMC_Total_Index.faiss",
-            "cpg": "indexes_and_articles/CPG/CPG_Total_Index.faiss",
-            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
+            "pubmed": "data/indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
+            "pmc": "data/indexes_and_articles/PMC/PMC_Total_Index.faiss",
+            "cpg": "data/indexes_and_articles/CPG/CPG_Total_Index.faiss",
+            "textbook": "data/indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
         })
         articles_paths = config_kwargs.pop("articles_paths", {
-            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
-            "pmc": "indexes_and_articles/PMC/PMC_Total_Articles.json",
-            "cpg": "indexes_and_articles/CPG/CPG_Total_Articles.json",
-            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Articles.json"
+            "pubmed": "data/indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
+            "pmc": "data/indexes_and_articles/PMC/PMC_Total_Articles.json",
+            "cpg": "data/indexes_and_articles/CPG/CPG_Total_Articles.json",
+            "textbook": "data/indexes_and_articles/Textbook/Textbook_Total_Articles.json"
         })
         
         # Create retriever
@@ -95,16 +95,16 @@ def run_chain(
     elif chain_type == "selfbiorag":
         # Extract FAISS paths (same as basic_rag)
         faiss_index_paths = config_kwargs.pop("faiss_index_paths", {
-            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
-            "pmc": "indexes_and_articles/PMC/PMC_Total_Index.faiss",
-            "cpg": "indexes_and_articles/CPG/CPG_Total_Index.faiss",
-            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
+            "pubmed": "data/indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
+            "pmc": "data/indexes_and_articles/PMC/PMC_Total_Index.faiss",
+            "cpg": "data/indexes_and_articles/CPG/CPG_Total_Index.faiss",
+            "textbook": "data/indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
         })
         articles_paths = config_kwargs.pop("articles_paths", {
-            "pubmed": "indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
-            "pmc": "indexes_and_articles/PMC/PMC_Total_Articles.json",
-            "cpg": "indexes_and_articles/CPG/CPG_Total_Articles.json",
-            "textbook": "indexes_and_articles/Textbook/Textbook_Total_Articles.json"
+            "pubmed": "data/indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
+            "pmc": "data/indexes_and_articles/PMC/PMC_Total_Articles.json",
+            "cpg": "data/indexes_and_articles/CPG/CPG_Total_Articles.json",
+            "textbook": "data/indexes_and_articles/Textbook/Textbook_Total_Articles.json"
         })
         
         # Create config
@@ -230,7 +230,7 @@ Examples:
     parser.add_argument(
         "--dataset",
         type=str,
-        default="original_repo/data/benchmark/med_qa_test.jsonl",
+        default="evidence_data/med_qa_test.jsonl",
         help="Path to test dataset (JSONL format)"
     )
     parser.add_argument(
@@ -312,14 +312,14 @@ Examples:
     parser.add_argument(
         "--top_k",
         type=int,
-        default=5,
-        help="Number of documents to retrieve (selfbiorag only)"
+        default=1,
+        help="Number of documents to retrieve"
     )
     parser.add_argument(
         "--retriever_path",
         type=str,
         default=None,
-        help="Path to retriever (selfbiorag only)"
+        help="Path to retriever"
     )
     
     args = parser.parse_args()

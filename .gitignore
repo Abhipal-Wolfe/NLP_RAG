@@ -5,13 +5,10 @@ __pycache__/
 venv/
 
 # Data
-data/
+evidence_data/*
 
 # Environment variables
 .env
 
 # original repository
 original_repo/
-
-# indexes and articles
-indexes_and_articles/
