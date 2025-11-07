@@ -75,16 +75,16 @@ def run_chain(
     elif chain_type == "basic_rag":
         # Extract FAISS paths
         faiss_index_paths = config_kwargs.pop("faiss_index_paths", {
-            "pubmed": "data/indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
-            "pmc": "data/indexes_and_articles/PMC/PMC_Total_Index.faiss",
-            "cpg": "data/indexes_and_articles/CPG/CPG_Total_Index.faiss",
-            "textbook": "data/indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
+            "pubmed": "evidence_data/indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss",
+            "pmc": "evidence_data/indexes_and_articles/PMC/PMC_Total_Index.faiss",
+            "cpg": "evidence_data/indexes_and_articles/CPG/CPG_Total_Index.faiss",
+            "textbook": "evidence_data/indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
         })
         articles_paths = config_kwargs.pop("articles_paths", {
-            "pubmed": "data/indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
-            "pmc": "data/indexes_and_articles/PMC/PMC_Total_Articles.json",
-            "cpg": "data/indexes_and_articles/CPG/CPG_Total_Articles.json",
-            "textbook": "data/indexes_and_articles/Textbook/Textbook_Total_Articles.json"
+            "pubmed": "evidence_data/indexes_and_articles/Pubmed/Pubmed_Total_Articles.json",
+            "pmc": "evidence_data/indexes_and_articles/PMC/PMC_Total_Articles.json",
+            "cpg": "evidence_data/indexes_and_articles/CPG/CPG_Total_Articles.json",
+            "textbook": "evidence_data/indexes_and_articles/Textbook/Textbook_Total_Articles.json"
         })
         
         # Create retriever
@@ -230,7 +230,7 @@ Examples:
     parser.add_argument(
         "--dataset",
         type=str,
-        default="evidence_data/med_qa_test.jsonl",
+        default="test_data/med_qa_test.jsonl",
         help="Path to test dataset (JSONL format)"
     )
     parser.add_argument(

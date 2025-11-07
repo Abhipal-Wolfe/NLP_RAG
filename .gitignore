@@ -5,7 +5,9 @@ __pycache__/
 venv/
 
 # Data
-evidence_data/*
+evidence_data/indexes_and_articles/
+evidence_data/medcpt_top10_evidence_bert.json
+evidence_data/medcpt_top10_evidence_corrected.json
 
 # Environment variables
 .env

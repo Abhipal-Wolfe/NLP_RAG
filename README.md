@@ -80,16 +80,16 @@ pip install -r requirements.txt
 ### **Run Evaluation**
 ```bash
 # Baseline LLM (no retrieval)
-python -m selfbiorag --chain baseline --max_samples 10
+python -m run_chain --chain baseline --max_samples 10
 
 # Basic RAG
-python -m selfbiorag --chain basic_rag --max_samples 10
+python -m run_chain --chain basic_rag --max_samples 10
 
 # Full Self-BioRAG
-python -m selfbiorag --chain selfbiorag --max_samples 10
+python -m run_chain --chain selfbiorag --max_samples 10
 
 # Customize model and settings
-python -m selfbiorag --chain baseline \
+python -m run_chain --chain baseline \
   --model_path meta-llama/Llama-2-7b-chat-hf \
   --dataset med_qa \
   --max_samples 100 \
