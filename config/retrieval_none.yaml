@@ -1,0 +1,20 @@
+# Retrieval Ablation: No retrieval (baseline)
+
+generator:
+  type: VLLMGenerator
+  model_path: "meta-llama/Llama-2-7b-chat-hf"
+  max_tokens: 200
+  temperature: 0.0
+
+retriever: null  # No retriever
+
+augmentations:
+  query: []
+  retrieval: []
+  rerank: []
+  generation: []
+  reflection: []
+
+dataset: "test_data/med_qa_train.json"
+max_samples: 100
+output_path: "experiments/results/retrieval_none"

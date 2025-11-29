@@ -1,0 +1,22 @@
+# Rerank Ablation: No reranking
+
+generator:
+  type: VLLMGenerator
+  model_path: "meta-llama/Llama-2-7b-chat-hf"
+  max_tokens: 200
+  temperature: 0.0
+
+retriever:
+  type: FAISSRetriever
+  top_k: 5
+
+augmentations:
+  query: []
+  retrieval: []
+  rerank: []  # No reranking
+  generation: []
+  reflection: []
+
+dataset: "test_data/med_qa_train.json"
+max_samples: 100
+output_path: "experiments/results/rerank_none"

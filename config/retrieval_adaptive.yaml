@@ -1,0 +1,24 @@
+# Retrieval Ablation: Adaptive retrieval (Self-BioRAG style)
+
+generator:
+  type: SelfBioRAGGenerator
+  model_path: "dmis-lab/selfbiorag_7b"
+  max_tokens: 200
+  temperature: 0.0
+
+retriever:
+  type: FAISSRetriever
+  top_k: 5
+
+augmentations:
+  query: []
+  retrieval:
+    - adaptive_retrieval:  # Decide when to retrieve
+        threshold: 0.5
+  rerank: []
+  generation: []
+  reflection: []
+
+dataset: "test_data/med_qa_train.json"
+max_samples: 100
+output_path: "experiments/results/retrieval_adaptive"

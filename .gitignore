@@ -1,16 +1,49 @@
 # Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Virtual environment
+# Virtual environments
 venv/
+ENV/
+env/
 
-# Data
-evidence_data/indexes_and_articles/
-evidence_data/medcpt_top10_evidence_bert.json
-evidence_data/medcpt_top10_evidence_corrected.json
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Environment variables
-.env
+# OS
+.DS_Store
+Thumbs.db
 
-# original repository
-original_repo/
+# Experiment outputs
+experiments/results/*
+!experiments/results/.gitkeep
+
+# Large data files
+evidence_data/
+*.faiss
+*.json.gz
+
+# Logs
+*.log

@@ -1,0 +1,24 @@
+# Reflection Ablation: Self-reflection (Self-BioRAG)
+
+generator:
+  type: SelfBioRAGGenerator
+  model_path: "dmis-lab/selfbiorag_7b"
+  max_tokens: 200
+  temperature: 0.0
+
+retriever:
+  type: FAISSRetriever
+  top_k: 5
+
+augmentations:
+  query: []
+  retrieval: []
+  rerank: []
+  generation: []
+  reflection:
+    - self_reflection:  # Validate and refine answer
+        max_iterations: 2
+
+dataset: "test_data/med_qa_train.json"
+max_samples: 100
+output_path: "experiments/results/reflection_self"

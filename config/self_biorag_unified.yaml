@@ -1,0 +1,48 @@
+# Self-BioRAG using unified pipeline with augmentations
+
+# Retriever + Self-BioRAG Generator
+retriever:
+  type: FAISSRetriever
+  top_k: 5
+  faiss_index_paths:
+    pubmed: "evidence_data/indexes_and_articles/Pubmed/Pubmed_Total_Index.faiss"
+    pmc: "evidence_data/indexes_and_articles/PMC/PMC_Total_Index.faiss"
+    cpg: "evidence_data/indexes_and_articles/CPG/CPG_Total_Index.faiss"
+    textbook: "evidence_data/indexes_and_articles/Textbook/Textbook_Total_Index.faiss"
+  articles_paths:
+    pubmed: "evidence_data/indexes_and_articles/Pubmed/Pubmed_Total_Articles.json"
+    pmc: "evidence_data/indexes_and_articles/PMC/PMC_Total_Articles.json"
+    cpg: "evidence_data/indexes_and_articles/CPG/CPG_Total_Articles.json"
+    textbook: "evidence_data/indexes_and_articles/Textbook/Textbook_Total_Articles.json"
+
+generator:
+  type: SelfBioRAGGenerator
+  model_path: "dmis-lab/selfbiorag_7b"
+  max_tokens: 200
+  temperature: 0.0
+
+# Self-BioRAG augmentations
+augmentations:
+  query: []  # No query decomposition
+
+  retrieval:  # Adaptive retrieval decision
+    - adaptive_retrieval:
+        threshold: 0.5
+
+  rerank:  # Critic-based reranking
+    - critic_reranker:
+        top_k: 3
+        w_rel: 1.0
+        w_sup: 1.0
+        w_use: 0.5
+
+  generation: []  # Standard generation
+
+  reflection:  # Self-reflection loop
+    - self_reflection:
+        max_iterations: 2
+
+# Dataset
+dataset: "test_data/med_qa_train.json"
+max_samples: 100
+output_path: "experiments/results/self_biorag_unified"

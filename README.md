@@ -1,148 +1,127 @@
-# NLP_RAG  
+# RAG Evaluation Framework
 
-Download pre-computed embeddings and article from [Download from Google Drive](https://drive.google.com/file/d/1Wqrv7g-g-c4xXTsg67v0rVOGcBige0_e/view?usp=drive_link)
+## Quick Start
 
-=======
-# Self-BioRAG Implementation & Evaluation Framework
+```bash
+pip install -r requirements.txt
+
+# Baseline (no retrieval)
+python main.py --config config/experiments/baseline_unified.yaml --max-samples 10
+
+# Self-BioRAG (full pipeline)
+python main.py --config config/experiments/self_biorag_unified.yaml --max-samples 10
+```
 
 ## Project Structure
 
 ```
-NLP_RAG/
-├── src/              # Main package - modular evaluation framework
-│   ├── chains/              # Evaluation chains (baseline, RAG, Self-BioRAG)
-│   ├── generator_models/    # LLM wrappers (vLLM-based generators)
-│   ├── retriever_models/    # Retrieval systems (biomedical retrievers)
-│   ├── infrastructure/      # Utilities (metrics, data loading, configs)
-│   └── run_chain.py         # CLI entry point for running evaluations
-│
-├── predictions/             # Evaluation results (JSON outputs)
-├── requirements.txt         # Python dependencies
-└── .env.example             # LangSmith tracing configuration
+├── main.py
+├── src/
+│   ├── prompts.py            # All prompts (separated)
+│   ├── core/
+│   │   ├── config_loader.py  # Config parsing + component builder
+│   │   ├── interfaces.py     # Abstract base classes
+│   │   └── registry.py       # Component factory
+│   ├── components/           # Retrievers, generators, evaluators
+│   ├── augmentations/        # Plugin functions
+│   │   ├── query_processing/
+│   │   ├── retrieval/
+│   │   ├── reranking/
+│   │   ├── generation/
+│   │   └── reflection/
+│   ├── data/                 # Dataset loaders
+│   └── utils/                # I/O, embedders
+└── config/
+    ├── experiments/          # Full pipeline configs
+    └── ablations/            # Ablation study configs
 ```
 
----
+## Ablation Studies
 
-## Core Components
+All ablations use the **same `main.py`** - just different config files!
 
-### **1. src/** - Main Package
+### Query Processing
 
-#### **chains/** - Evaluation Pipelines
-- **`base.py`** - Abstract Chain with LangSmith tracing
-- **`baseline_chain.py`** - Standard LLM (zero/few-shot, no retrieval)
-- **`basic_rag_chain.py`** - Simple RAG with pre-retrieved evidence
-- **`selfbiorag_chain.py`** - Full Self-BioRAG with adaptive retrieval and reflection tokens
-
-#### **generator_models/** - LLM Wrappers
-- **`models.py`** - vLLM-based interface supporting HuggingFace models with batch inference and GPU optimization
-
-#### **retriever_models/** - Retrieval Systems
-- **`retriever.py`** - Biomedical retriever with pre-retrieved evidence loading and optional FAISS search
-
-#### **infrastructure/** - Utilities
-- **`utils.py`** - Metrics (`normalize_answer`, `calculate_accuracy`), data I/O
-- **`factory.py`** - Configuration and initialization
-
-#### **Root Files**
-- **`run_chain.py`** - CLI interface for running evaluations
-- **`__main__.py`** - Enables `python -m selfbiorag` execution
-- **`__init__.py`** - Package initialization and exports
-
----
-
-### **2. predictions/** - Evaluation Outputs
-
-JSON files containing model predictions and evaluation metrics:
-```json
-{
-  "prediction": "Model's answer",
-  "ground_truth": "Correct answer",
-  "is_correct_substring": true,
-  "is_correct_exact": false,
-  "metadata": {"question_id": "...", "dataset": "med_qa"}
-}
-```
-
----
-
-## Quick Start
-
-### **Installation**
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or: venv/Scripts/activate on Windows
+# No query processing
+python main.py --config config/ablations/query_none.yaml
 
-# Install dependencies
-pip install -r requirements.txt
+# Multi-query expansion
+python main.py --config config/ablations/query_multi.yaml
 ```
 
-### **Run Evaluation**
+### Retrieval
+
 ```bash
-# Baseline LLM (no retrieval)
-python -m run_chain --chain baseline --max_samples 10
+# No retrieval (baseline)
+python main.py --config config/ablations/retrieval_none.yaml
 
-# Basic RAG
-python -m run_chain --chain basic_rag --max_samples 10
-
-# Full Self-BioRAG
-python -m run_chain --chain selfbiorag --max_samples 10
-
-# Customize model and settings
-python -m run_chain --chain baseline \
-  --model_path meta-llama/Llama-2-7b-chat-hf \
-  --dataset med_qa \
-  --max_samples 100 \
-  --temperature 0.0
+# Adaptive retrieval (Self-BioRAG)
+python main.py --config config/ablations/retrieval_adaptive.yaml
 ```
 
-### **View Results**
+### Reranking
+
 ```bash
-# Check predictions
-cat predictions/baseline_*.json
+# No reranking
+python main.py --config config/ablations/rerank_none.yaml
 
-# View summary
-cat predictions/baseline_*_summary.json
+# Critic-based reranking (Self-BioRAG)
+python main.py --config config/ablations/rerank_critic.yaml
 ```
 
----
+### Reflection
 
-## Key Features
+```bash
+# No reflection
+python main.py --config config/ablations/reflection_none.yaml
 
-- **Modular Design** - Swap models, chains, and retrievers easily
-- **LangSmith Tracing** - Built-in observability (configure via `.env`)
-- **Multiple Metrics** - Exact match and substring match evaluation
-- **Few-Shot Support** - Automatic few-shot examples from training data
-- **Batch Processing** - Efficient GPU utilization with vLLM
-- **Pre-Retrieved Evidence** - 208 MB of evidence ready for evaluation
+# Self-reflection (Self-BioRAG)
+python main.py --config config/ablations/reflection_self.yaml
+```
 
----
+See `config/ablations/README.md` for more details.
 
 ## Configuration
 
-### **Environment Variables** (`.env`)
-```bash
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your_api_key
-LANGCHAIN_PROJECT=selfbiorag-evaluation
+```yaml
+# config/experiments/self_biorag_unified.yaml
+generator:
+  type: SelfBioRAGGenerator
+  model_path: "dmis-lab/selfbiorag_7b"
+
+retriever:
+  type: FAISSRetriever
+  top_k: 5
+
+augmentations:
+  retrieval:
+    - adaptive_retrieval:  # Decide if retrieval needed
+        threshold: 0.5
+  rerank:
+    - critic_reranker:     # Score docs with LLM
+        top_k: 3
+  reflection:
+    - self_reflection:     # Validate answer
+        max_iterations: 2
+
+dataset: "test_data/med_qa_train.json"
+output_path: "experiments/results/self_biorag"
 ```
 
-### **CLI Arguments**
-- `--chain` - baseline | basic_rag | selfbiorag
-- `--model_path` - HuggingFace model ID
-- `--dataset` - med_qa | medmc_qa | mmlu
-- `--max_samples` - Number of questions to evaluate
-- `--no_few_shot` - Disable few-shot prompting
-- `--max_model_len` - Context window size (default: 4096)
-- `--gpu_memory_utilization` - GPU memory fraction (default: 0.7)
+## Results
 
----
+Saved to `experiments/results/`:
+```json
+{
+  "predictions": ["answer1", "answer2", ...],
+  "metrics": {
+    "substring_match": {"accuracy": 65.5, "correct": 655, "total": 1000}
+  }
+}
+```
 
-## Resources
+## References
 
-- **Original Paper**: [Self-BioRAG (arXiv)](https://arxiv.org/abs/2401.15269)
-- **Original Code**: [dmis-lab/self-biorag](https://github.com/dmis-lab/self-biorag)
-- **Models**: [HuggingFace Hub](https://huggingface.co/dmis-lab)
-
----
->>>>>>> eeb4e1d (initial commit with the baseline, base RAG, selfbio rag implementations)
+- [Self-BioRAG Paper](https://arxiv.org/abs/2401.15269)
+- [Original Code](https://github.com/dmis-lab/self-biorag)
