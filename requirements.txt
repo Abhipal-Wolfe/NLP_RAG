@@ -1,19 +1,15 @@
-# Core dependencies
 numpy>=1.24.0
 torch>=2.0.0
 transformers>=4.30.0
 
-# Efficient LLM inference
+# RAG / Embeddings
+sentence-transformers>=3.0.0
+
+# FAISS with GPU support (Linux)
+faiss-gpu>=1.7.0
+
+pyyaml>=6.0.0
+tqdm>=4.65.0
 vllm>=0.2.0
 
-# Vector search
-faiss-cpu>=1.7.0  # Use faiss-gpu for GPU support
-
-# Configuration
-pyyaml>=6.0.0
-
-# Progress bars
-tqdm>=4.65.0
-
-# Development (optional)
 pytest>=7.0.0

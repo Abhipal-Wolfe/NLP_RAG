@@ -47,3 +47,9 @@ evidence_data/
 
 # Logs
 *.log
+
+# Virtual environment
+.venv/
+
+# Data
+data/
