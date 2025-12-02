@@ -3,7 +3,7 @@
 # Retriever + Generator
 retriever:
   type: FAISSRetriever
-  top_k: 1
+  top_k: 3
   faiss_index_paths: "data/index/med_faiss.index"
   articles_paths: "data/corpus/med_pure_corpus.jsonl"
   metadata_paths: "data/index/med_faiss_meta.jsonl"
@@ -28,4 +28,4 @@ augmentations:
 dataset: "eval_datasets/medqa_test.jsonl"
 max_samples: null  # Start small for testing - change to 100 or more later
 verbose: true  # Print detailed logs (prompts, documents, predictions)
-output_path: "predictions/standard_rag_llm"
+output_path: "predictions/standard_rag"

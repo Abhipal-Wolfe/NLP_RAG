@@ -136,10 +136,33 @@ class VLLMGenerator(Generator):
         """Format prompt with optional context and few-shot examples"""
         from ...prompts import format_question, format_rag_prompt
         
+        # Truncate documents to fit within model's context limit
+        # Reserve: ~1500 tokens for few-shot, ~500 for query, ~500 for generation
+        # With top_k=3: ~500 tokens per document
+        MAX_DOC_CHARS_PER_DOC = 2500  # ~625 tokens per document
+        MAX_TOTAL_CONTEXT_CHARS = 7000  # ~1750 tokens total for all documents
+        
         # Use proper prompt templates from prompts.py
         if context:
-            # RAG mode: format with context
-            context_text = "\n\n".join([doc.page_content for doc in context])
+            # RAG mode: format with context (truncated)
+            context_parts = []
+            total_chars = 0
+            
+            for doc in context:
+                content = doc.page_content
+                
+                # Truncate individual document if too long
+                if len(content) > MAX_DOC_CHARS_PER_DOC:
+                    content = content[:MAX_DOC_CHARS_PER_DOC] + "... [truncated]"
+                
+                # Check if adding this document would exceed total limit
+                if total_chars + len(content) > MAX_TOTAL_CONTEXT_CHARS:
+                    break
+                
+                total_chars += len(content)
+                context_parts.append(content)
+            
+            context_text = "\n\n".join(context_parts)
             return format_rag_prompt(query, context_text, use_few_shot=self.use_few_shot)
         else:
             # Baseline mode: format without context

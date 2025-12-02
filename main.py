@@ -30,6 +30,7 @@ def main():
     # Use command-line arg if provided, otherwise use config value
     max_samples = args.max_samples if args.max_samples is not None else config.get("max_samples")
     data = loader.load_dataset(config["dataset"], max_samples=max_samples)
+    data = data[2:10]
     
     # Format questions with options (moved to prompts.py)
     queries = [format_question_with_options(item) for item in data]
@@ -112,7 +113,7 @@ def main():
             
             for aug_idx, aug in enumerate(augmentations.get("query", [])):
                 old_processed = processed.copy()
-                processed = aug(processed, ctx)
+                processed = aug(processed, {}, ctx)  # (queries, metadata, pipeline_context)
                 if verbose and i == 0:
                     aug_name = getattr(aug, '__name__', str(aug))
                     print(f"\nAugmentation {aug_idx+1}: {aug_name}")
@@ -160,21 +161,80 @@ def main():
                 if should_retrieve:
                     # Get top_k from retriever config or global config
                     top_k = config.get("retriever", {}).get("top_k", config.get("top_k", 5))
-                    if verbose and i == 0:
-                        print(f"  Retrieving top_k={top_k} documents...")
                     
-                    documents = components["retriever"].retrieve(processed[0], k=top_k).documents
+                    # DMQR-RAG: Multi-query retrieval with passage merging
+                    if len(processed) > 1:
+                        # Multiple sub-queries: retrieve for each and merge
+                        if verbose and i == 0:
+                            print(f"\n" + "="*100)
+                            print("MULTI-QUERY RETRIEVAL (DMQR-RAG)")
+                            print("="*100)
+                            print(f"Number of sub-queries: {len(processed)}")
+                            print(f"Top-K per query: {top_k}")
+                            print(f"\n--- GENERATED SUB-QUERIES (FULL TEXT) ---")
+                            for q_idx, sq in enumerate(processed):
+                                print(f"\n[Sub-query {q_idx + 1}]")
+                                print(sq)
+                        
+                        all_documents = []
+                        seen_content = set()  # For deduplication
+                        
+                        for q_idx, sub_query in enumerate(processed):
+                            sub_docs = components["retriever"].retrieve(sub_query, k=top_k).documents
+                            
+                            if verbose and i == 0:
+                                print(f"\n" + "-"*80)
+                                print(f"RETRIEVAL FOR SUB-QUERY {q_idx + 1}")
+                                print("-"*80)
+                                print(f"Query: {sub_query}")
+                                print(f"Documents retrieved: {len(sub_docs)}")
+                                
+                                for doc_idx, doc in enumerate(sub_docs):
+                                    print(f"\n  [Doc {doc_idx + 1}] Score: {doc.metadata.get('score', 'N/A'):.4f}")
+                                    print(f"  Content preview: {doc.page_content[:200]}...")
+                            
+                            # Add unique documents (deduplicate by content)
+                            added_count = 0
+                            for doc in sub_docs:
+                                content_hash = hash(doc.page_content[:500])  # Hash first 500 chars
+                                if content_hash not in seen_content:
+                                    seen_content.add(content_hash)
+                                    doc.metadata['source_query'] = sub_query
+                                    doc.metadata['query_idx'] = q_idx
+                                    all_documents.append(doc)
+                                    added_count += 1
+                            
+                            if verbose and i == 0:
+                                if added_count < len(sub_docs):
+                                    print(f"\n  -> Added {added_count}/{len(sub_docs)} (duplicates removed)")
+                                else:
+                                    print(f"\n  -> Added {added_count} unique documents")
+                        
+                        documents = all_documents
+                        
+                        if verbose and i == 0:
+                            print(f"\n" + "="*100)
+                            print(f"MERGED DOCUMENT SET: {len(documents)} unique documents")
+                            print("="*100)
+                    else:
+                        # Single query: standard retrieval
+                        if verbose and i == 0:
+                            print(f"  Retrieving top_k={top_k} documents...")
+                        
+                        documents = components["retriever"].retrieve(processed[0], k=top_k).documents
                     
                     if verbose and i == 0:
                         if documents:
                             print(f"\n[RETRIEVED {len(documents)} DOCUMENTS]")
-                            for j, doc in enumerate(documents):
+                            for j, doc in enumerate(documents[:5]):  # Show first 5
                                 print(f"\n--- Document {j+1} ---")
                                 print(f"Score: {doc.metadata.get('score', 'N/A')}")
-                                print(f"Corpus: {doc.metadata.get('corpus', 'default')}")
-                                print(f"Doc ID: {doc.metadata.get('doc_id', 'N/A')}")
-                                print(f"Content (first 400 chars):")
-                                print(f"{doc.page_content[:400]}...")
+                                if doc.metadata.get('source_query'):
+                                    print(f"Source Query: {doc.metadata.get('source_query')}...")
+                                print(f"Content (first 300 chars):")
+                                print(f"{doc.page_content[:300]}...")
+                            if len(documents) > 5:
+                                print(f"\n... and {len(documents) - 5} more documents")
                         else:
                             print("[WARNING] No documents retrieved!")
                 else:

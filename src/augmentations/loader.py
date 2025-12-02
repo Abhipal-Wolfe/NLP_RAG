@@ -1,6 +1,7 @@
 """Augmentation loader: Instantiate augmentations from config"""
 
 from typing import Dict, Any, List, Callable
+from .query_processing.multi_query import create_multi_query_augmentation
 from .retrieval.adaptive_retrieval import create_adaptive_retrieval_augmentation
 from .reranking.critic_reranker import create_critic_reranker_augmentation
 from .reflection.self_reflection import create_self_reflection_augmentation
@@ -25,6 +26,18 @@ def load_augmentations(config: Dict[str, Any]) -> Dict[str, List[Callable]]:
         "generation": [],
         "reflection": []
     }
+    
+    # Load query processing augmentations
+    for aug_spec in aug_config.get("query", []):
+        if isinstance(aug_spec, dict):
+            aug_name = list(aug_spec.keys())[0]
+            aug_params = aug_spec.get(aug_name, {})
+            
+            if aug_name == "multi_query" or aug_name == "query_decomposition":
+                max_sub_queries = aug_params.get("max_sub_queries", 4)
+                augmentations["query"].append(
+                    create_multi_query_augmentation(max_sub_queries=max_sub_queries)
+                )
     
     # Load retrieval augmentations
     for aug_spec in aug_config.get("retrieval", []):
