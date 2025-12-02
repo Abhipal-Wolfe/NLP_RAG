@@ -3,6 +3,7 @@
 from typing import List, Dict, Any, Tuple
 import numpy as np
 from ...core.document import Document
+from ...prompts import format_critic_prompt
 
 
 def critic_reranker_augmentation(
@@ -38,6 +39,8 @@ def critic_reranker_augmentation(
     """
     generator = pipeline_context.get("generator")
     config = pipeline_context.get("config", {})
+    verbose = config.get("verbose", False)
+    idx = pipeline_context.get("idx", 0)
 
     # Check if generator supports reflection tokens
     if not hasattr(generator, "get_reflection_tokens"):
@@ -52,36 +55,105 @@ def critic_reranker_augmentation(
 
     # Generate prompts for each document
     prompts = []
-    for doc in documents:
+    for doc_idx, doc in enumerate(documents):
         title = doc.metadata.get("title", "")
         content = doc.page_content
-        paragraph = f"{title}\n{content}" if title else content
-        prompt = f"{query}[Retrieval]<paragraph>{paragraph}</paragraph>\n\n### Response:\n"
+        
+        # Use standard format from prompts.py
+        prompt = format_critic_prompt(query, content, title)
         prompts.append(prompt)
+        
+        if verbose and idx == 0:
+            print(f"\n  --- DOCUMENT {doc_idx + 1} ---")
+            print(f"  Title: {title if title else 'No title'}")
+            print(f"  FAISS Score: {doc.metadata.get('score', 'N/A'):.4f}")
+            print(f"  Content length: {len(content)} chars")
+            print(f"  Content preview: {content[:200]}...")
+            
+            if doc_idx == 0:
+                print(f"\n  --- CRITIC PROMPT EXAMPLE (Doc 1 only) ---")
+                print(prompt)
+                print("  " + "="*80)
 
     # Generate with logprobs
-    results = generator.generate_with_logprobs(prompts)
+    if verbose and idx == 0:
+        print(f"\n  --- GENERATING REFLECTION TOKENS FOR {len(documents)} DOCUMENTS ---")
+    
+    results = generator.generate_with_logprobs(prompts, max_tokens=100)  # Increased to ensure utility tokens aren't cut off
+    
+    if verbose and idx == 0:
+        print(f"  Generation complete. Extracting reflection token probabilities...")
 
-    # Score each document
+    # Score each document and extract individual components
     doc_scores = []
-    for result in results:
-        score = _compute_score(
-            result,
-            rel_tokens,
-            grd_tokens,
-            ut_tokens,
-            w_rel,
-            w_sup,
-            w_use
-        )
-        doc_scores.append(score)
+    doc_score_details = []
+    
+    for doc_idx, result in enumerate(results):
+        pred_token_ids = result.get("token_ids", [])
+        pred_log_probs = result.get("logprobs", [])
+        
+        # Extract individual scores
+        rel_score = _extract_relevance_score(pred_log_probs, rel_tokens)
+        grd_score = _extract_groundedness_score(pred_token_ids, pred_log_probs, grd_tokens)
+        ut_score = _extract_utility_score(pred_token_ids, pred_log_probs, ut_tokens)
+        
+        # Compute final score
+        final_score = w_rel * rel_score + w_sup * grd_score + w_use * ut_score
+        
+        doc_scores.append(final_score)
+        doc_score_details.append({
+            "relevance": rel_score,
+            "groundedness": grd_score,
+            "utility": ut_score,
+            "final": final_score
+        })
+        
+        # Show individual document scores
+        if verbose and idx == 0:
+            model_output = result.get('text', 'N/A')
+            print(f"\n  --- DOCUMENT {doc_idx + 1} SCORING ---")
+            print(f"  Model output: {model_output}")
+            print(f"  Scores:")
+            print(f"    Relevance:    {rel_score:.4f}")
+            print(f"    Groundedness: {grd_score:.4f}")
+            print(f"    Utility:      {ut_score:.4f}")
+            print(f"    Final Score:  {final_score:.4f} (= {w_rel}*{rel_score:.3f} + {w_sup}*{grd_score:.3f} + {w_use}*{ut_score:.3f})")
 
     # Sort by score (descending)
     sorted_indices = np.argsort(doc_scores)[::-1]
-    reranked_docs = [documents[i] for i in sorted_indices[:top_k]]
+    
+    # Show ranking changes
+    if verbose and idx == 0:
+        print(f"\n  --- RANKING COMPARISON ---")
+        print(f"  Original Order → Reranked Order (by critic score)")
+        for new_rank, orig_idx in enumerate(sorted_indices[:top_k], 1):
+            print(f"    Doc {orig_idx + 1} (FAISS: {documents[orig_idx].metadata.get('score', 'N/A'):.4f}) "
+                  f"→ Rank {new_rank} (Critic: {doc_scores[orig_idx]:.4f})")
+    
+    reranked_docs = []
+    
+    for idx_in_sorted in sorted_indices[:top_k]:
+        doc = documents[idx_in_sorted]
+        details = doc_score_details[idx_in_sorted]
+        
+        # Add reranking scores to document metadata
+        doc.metadata['rerank_score'] = details['final']
+        doc.metadata['relevance_score'] = details['relevance']
+        doc.metadata['support_score'] = details['groundedness']
+        doc.metadata['utility_score'] = details['utility']
+        
+        reranked_docs.append(doc)
+    
     reranked_scores = [doc_scores[i] for i in sorted_indices[:top_k]]
 
-    return reranked_docs, reranked_scores
+    return reranked_docs, {
+        "reranked_scores": reranked_scores,
+        "top_k": len(reranked_docs),
+        "original_count": len(documents),
+        "avg_relevance": np.mean([d["relevance"] for d in doc_score_details]),
+        "avg_groundedness": np.mean([d["groundedness"] for d in doc_score_details]),
+        "avg_utility": np.mean([d["utility"] for d in doc_score_details])
+    }
 
 
 def _compute_score(

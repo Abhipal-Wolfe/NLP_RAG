@@ -1,12 +1,19 @@
 numpy>=1.24.0
+
+# PyTorch with GPU support (CUDA)
+# For Windows/Linux with CUDA 12.1: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
 torch>=2.0.0
-transformers>=4.30.0
+torchvision>=0.15.0
+
+transformers==4.40.0
 
 # RAG / Embeddings
 sentence-transformers>=3.0.0
 
-# FAISS with GPU support (Linux)
-faiss-gpu>=1.7.0
+# FAISS - faiss-cpu is more reliably available via pip
+# For GPU support, use: conda install -c pytorch -c nvidia faiss-gpu=1.7.4
+faiss-cpu>=1.7.4
 
 pyyaml>=6.0.0
 tqdm>=4.65.0

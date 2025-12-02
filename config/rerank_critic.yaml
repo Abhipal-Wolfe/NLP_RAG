@@ -22,6 +22,6 @@ augmentations:
   generation: []
   reflection: []
 
-dataset: "test_data/med_qa_train.json"
+dataset: "eval_datasets/medqa_train.jsonl"
 max_samples: 100
 output_path: "experiments/results/rerank_critic"

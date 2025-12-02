@@ -216,15 +216,29 @@ def build_components(config: dict) -> dict:
         if ret_cfg["type"] == "FAISSRetriever":
             components["retriever"] = FAISSRetriever(
                 faiss_index_paths=ret_cfg["faiss_index_paths"],
-                articles_paths=ret_cfg["articles_paths"]
+                articles_paths=ret_cfg["articles_paths"],
+                metadata_paths=ret_cfg.get("metadata_paths"),
+                embedder_model=ret_cfg.get("embedder_model", "NeuML/pubmedbert-base-embeddings")
             )
 
     # Build generator
     gen_cfg = config["generator"]
     if gen_cfg["type"] == "VLLMGenerator":
-        components["generator"] = VLLMGenerator(model_path=gen_cfg["model_path"])
+        components["generator"] = VLLMGenerator(
+            model_path=gen_cfg["model_path"],
+            max_tokens=gen_cfg.get("max_tokens", 200),
+            temperature=gen_cfg.get("temperature", 0.0),
+            enforce_eager=gen_cfg.get("enforce_eager", True),
+            gpu_memory_utilization=gen_cfg.get("gpu_memory_utilization", 0.7)
+        )
     elif gen_cfg["type"] == "SelfBioRAGGenerator":
-        components["generator"] = SelfBioRAGGenerator(model_path=gen_cfg["model_path"])
+        components["generator"] = SelfBioRAGGenerator(
+            model_path=gen_cfg["model_path"],
+            max_tokens=gen_cfg.get("max_tokens", 200),
+            temperature=gen_cfg.get("temperature", 0.0),
+            enforce_eager=gen_cfg.get("enforce_eager", True),
+            gpu_memory_utilization=gen_cfg.get("gpu_memory_utilization", 0.7)
+        )
 
     # Build evaluator
     components["evaluator"] = AccuracyEvaluator()

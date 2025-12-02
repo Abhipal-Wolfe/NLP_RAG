@@ -10,9 +10,12 @@ from tqdm import tqdm
 # -------------------------------------------------------------------
 # Config
 # -------------------------------------------------------------------
-CORPUS_DIR = Path("data/corpus")
+CORPUS_DIR = Path("data/corpus2")
 CORPUS_DIR.mkdir(parents=True, exist_ok=True)
 OUT_PATH = CORPUS_DIR / "med_pure_corpus.jsonl"
+
+MIN_DOC_LENGTH = 50  # characters
+MAX_DOC_LENGTH = 10000
 
 # Limit per source (None = use all rows)
 MAX_DOCS_PER_SOURCE = {
@@ -78,8 +81,8 @@ def process_pubmed_shard(
                 break
             iter_rows += 1
 
-            raw_text = (ex.get("contents") or "").strip()
-            if not raw_text:
+            raw_text = (ex.get("content") or "").strip()
+            if not raw_text or len(raw_text) < MIN_DOC_LENGTH or len(raw_text) > MAX_DOC_LENGTH:
                 continue
 
             title = (ex.get("title") or "").strip()
@@ -241,28 +244,6 @@ if __name__ == "__main__":
     else:
         print("[WARN] No PubMed shard files produced.")
 
-    # ---------------- Textbooks (sequential, no chunk) ----------------
-    write_docs_for_source(
-        hf_id="MedRAG/textbooks",
-        split="train",
-        source_name="textbook",
-        text_field="contents",
-        title_field="title",
-        id_field="id",
-        max_docs=MAX_DOCS_PER_SOURCE["textbook"],
-        extra_meta_fields=None,
-    )
 
-    # ---------------- Clinical Guidelines (sequential, no chunk) -----
-    write_docs_for_source(
-        hf_id="epfl-llm/guidelines",
-        split="train",
-        source_name="guideline",
-        text_field="clean_text",
-        title_field="title",
-        id_field="id",
-        max_docs=MAX_DOCS_PER_SOURCE["guideline"],
-        extra_meta_fields=["source", "url"],
-    )
 
     print(f"\n✅ Done. Unified corpus written to: {OUT_PATH}")

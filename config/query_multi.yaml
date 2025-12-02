@@ -2,7 +2,7 @@
 
 generator:
   type: VLLMGenerator
-  model_path: "meta-llama/Llama-2-7b-chat-hf"
+  model_path: "meta-llama/Llama-2-7b-hf"
   max_tokens: 200
   temperature: 0.0
 
@@ -18,6 +18,6 @@ augmentations:
   generation: []
   reflection: []
 
-dataset: "test_data/med_qa_train.json"
+dataset: "eval_datasets/medqa_train.jsonl"
 max_samples: 100
 output_path: "experiments/results/query_multi"

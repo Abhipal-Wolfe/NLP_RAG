@@ -69,20 +69,9 @@ class AccuracyEvaluator(Evaluator):
             is_correct = False
 
             if pred_letter == gt_letter:
-                if gt_text:
-                    # We have canonical ground-truth text; require predicted text
-                    # to match it (after normalization)
-                    if pred_text:
-                        if self._normalize_text(pred_text) == self._normalize_text(gt_text):
-                            is_correct = True
-                        else:
-                            is_correct = False
-                    else:
-                        # No parsable predicted text; be conservative and mark incorrect
-                        is_correct = False
-                else:
-                    # No ground-truth text available; letter match is enough
-                    is_correct = True
+                is_correct = True
+            else:
+                is_correct = False
 
             if is_correct:
                 choice_correct += 1

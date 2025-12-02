@@ -134,21 +134,16 @@ class VLLMGenerator(Generator):
 
     def _format_prompt(self, query: str, context: Optional[List[Document]] = None) -> str:
         """Format prompt with optional context and few-shot examples"""
-        prompt_parts = []
-
-        # Add few-shot examples if enabled
-        if self.use_few_shot and self.few_shot_examples:
-            prompt_parts.append(f"### Examples:\n{self.few_shot_examples}\n")
-
-        # Add context if provided
+        from ...prompts import format_question, format_rag_prompt
+        
+        # Use proper prompt templates from prompts.py
         if context:
+            # RAG mode: format with context
             context_text = "\n\n".join([doc.page_content for doc in context])
-            prompt_parts.append(f"### Context:\n{context_text}\n")
-
-        # Add query
-        prompt_parts.append(f"### Question:\n{query}\n\n### Answer:\n")
-
-        return "\n".join(prompt_parts)
+            return format_rag_prompt(query, context_text, use_few_shot=self.use_few_shot)
+        else:
+            # Baseline mode: format without context
+            return format_question(query, use_few_shot=self.use_few_shot)
 
     def _postprocess(self, answer: str) -> str:
         """Clean up generated answer"""

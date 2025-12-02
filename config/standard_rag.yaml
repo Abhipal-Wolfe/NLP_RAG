@@ -1,0 +1,31 @@
+# Standard RAG using unified pipeline (no augmentations, just retrieval)
+
+# Retriever + Generator
+retriever:
+  type: FAISSRetriever
+  top_k: 1
+  faiss_index_paths: "data/index/med_faiss.index"
+  articles_paths: "data/corpus/med_pure_corpus.jsonl"
+  metadata_paths: "data/index/med_faiss_meta.jsonl"
+
+generator:
+  type: VLLMGenerator
+  model_path: "togethercomputer/Llama-2-7B-32K-Instruct"
+  max_tokens: 200
+  temperature: 0.0
+  enforce_eager: false  # Enable CUDA graphs for faster generation
+  gpu_memory_utilization: 0.85  # Use more GPU memory for KV cache
+
+# No augmentations (vanilla RAG)
+augmentations:
+  query: []
+  retrieval: []  # No adaptive retrieval - always retrieve
+  rerank: []     # No reranking
+  generation: []
+  reflection: []
+
+# Dataset
+dataset: "eval_datasets/medqa_test.jsonl"
+max_samples: null  # Start small for testing - change to 100 or more later
+verbose: true  # Print detailed logs (prompts, documents, predictions)
+output_path: "predictions/standard_rag_llm"

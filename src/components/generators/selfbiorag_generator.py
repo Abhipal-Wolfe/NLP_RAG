@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 from ...core.document import Document
+from ...prompts import FEW_SHOT_MEDQA
 
 from ...core.interfaces import Generator, GenerationResult
 from ...core.registry import register_component
@@ -60,7 +61,8 @@ class SelfBioRAGGenerator(Generator):
         self.temperature = temperature
         self.use_few_shot = use_few_shot
         self.dataset_name = dataset_name
-        self.few_shot_examples = few_shot_examples
+        # Use provided examples or default to FEW_SHOT_MEDQA
+        self.few_shot_examples = few_shot_examples if few_shot_examples else FEW_SHOT_MEDQA
         self.model_path = model_path
 
         # Load reflection token IDs
@@ -122,7 +124,9 @@ class SelfBioRAGGenerator(Generator):
                 answer=self._postprocess(pred.outputs[0].text),
                 metadata={
                     "model": self.model_path,
-                    "raw_output": pred.outputs[0].text
+                    "raw_output": pred.outputs[0].text,
+                    "token_ids": pred.outputs[0].token_ids,
+                    "logprobs": pred.outputs[0].logprobs
                 }
             )
             for pred in results
@@ -161,27 +165,42 @@ class SelfBioRAGGenerator(Generator):
         ]
 
     def _format_prompt(self, query: str, context: Optional[List[Document]] = None) -> str:
-        """Format prompt for Self-BioRAG"""
+        """
+        Format prompt for Self-BioRAG:
+        
+        Structure:
+        1. Few-shot examples
+        3. ## Question: 
+        4. ## Options:
+        5. ## Response:
+        """
         prompt_parts = []
 
-        # Add few-shot examples if enabled
+        # Add few-shot examples (FEW_SHOT_MEDQA format)
         if self.use_few_shot and self.few_shot_examples:
-            prompt_parts.append(f"### Examples:\n{self.few_shot_examples}\n")
+            prompt_parts.append(self.few_shot_examples)
 
-        # Add query
-        prompt_parts.append(f"### Instruction:\n{query}\n")
 
-        # Add context with retrieval token if provided
+        # Add question header, then query (which already includes ## Options:)
+        prompt_parts.append(f"\n## Question:\n{query}")
+
+        # Add response section
+        prompt_parts.append(f"\n## Response:\n")
+
+        # Add context FIRST with retrieval token if provided
         if context:
-            context_text = "\n\n".join([
-                f"<paragraph>{doc.page_content}</paragraph>"
-                for doc in context
-            ])
-            prompt_parts.append(f"[Retrieval]{context_text}\n")
-
-        prompt_parts.append("### Response:\n")
-
-        return "\n".join(prompt_parts)
+            paragraphs = []
+            for doc in context:
+                title = doc.metadata.get('title', '')
+                content = doc.page_content
+                # Include title on first line if available
+                if title:
+                    paragraphs.append(f"[Retrieval]<paragraph>{title}\n{content}</paragraph>")
+                else:
+                    paragraphs.append(f"[Retrieval]<paragraph>{content}</paragraph>")
+            context_text = "\n\n".join(paragraphs)
+            prompt_parts.append(context_text)
+        return "".join(prompt_parts)
 
     def _postprocess(self, answer: str) -> str:
         """Remove reflection tokens and special tokens from answer"""

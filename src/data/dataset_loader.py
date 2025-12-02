@@ -15,7 +15,7 @@ class DatasetLoader:
     - Multiple dataset types (MedQA, BioASQ, PubMedQA, etc.)
     """
 
-    def __init__(self, data_dir: str = "test_data"):
+    def __init__(self, data_dir: str = "data"):
         """
         Args:
             data_dir: Root directory for datasets

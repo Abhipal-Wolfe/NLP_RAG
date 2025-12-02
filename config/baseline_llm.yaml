@@ -1,0 +1,28 @@
+# Baseline experiment using unified pipeline (no augmentations, no retrieval)
+
+# Generator only (no retriever)
+generator:
+  type: VLLMGenerator
+  model_path: "meta-llama/Llama-2-7b-hf"
+  max_tokens: 200
+  temperature: 0.0
+  enforce_eager: false  # Enable CUDA graphs for faster generation
+  gpu_memory_utilization: 0.85  # Use more GPU memory for KV cache
+
+# No retriever
+retriever: null
+
+# No augmentations (empty lists)
+augmentations:
+  query: []
+  retrieval: []
+  rerank: []
+  generation: []
+  reflection: []
+
+# Dataset
+dataset: "eval_datasets/medqa_test.jsonl"
+max_samples: null  # null (not None) in YAML, or omit this line to load all samples
+batch_size: 512  # Batch size for inference (higher = faster but more memory)
+verbose: true  # Print detailed logs (prompts, documents, predictions)
+output_path: "predictions/baseline_llm"
