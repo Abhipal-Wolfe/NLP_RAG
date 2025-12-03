@@ -1,5 +1,5 @@
 # Create fresh with all dependencies at once
-conda create -n nlp_env python=3.10 -y
+conda create -n nlp_env python=3.10 -y  
 conda activate nlp_env
 
 # Install everything in one command (resolves dependencies better)
