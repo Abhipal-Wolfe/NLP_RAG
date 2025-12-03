@@ -1,4 +1,3 @@
-# scripts/build_faiss_index_fast.py
 import json
 import os
 from pathlib import Path
@@ -12,39 +11,40 @@ from tqdm import tqdm
 # -------------------------------------------------------------------
 # Config
 # -------------------------------------------------------------------
-CORPUS_PATH = Path("../data/corpus/med_pure_corpus.jsonl")
+CORPUS_PATH = Path("data/corpus/med_chunked_corpus.jsonl")
 
 INDEX_DIR = Path("data/index")
 INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
-INDEX_OUT_PATH = INDEX_DIR / "med_faiss.index"
-META_OUT_PATH = INDEX_DIR / "med_faiss_meta.jsonl"
+INDEX_OUT_PATH = INDEX_DIR / "med_faiss_chunked.index"
+META_OUT_PATH = INDEX_DIR / "med_faiss_chunked_meta.jsonl"
 
 # Best free biomedical retrieval model for PubMed / MEDQA
 MODEL_NAME = "NeuML/pubmedbert-base-embeddings"
 
 # Tune these for speed vs memory
-BATCH_SIZE = int(os.environ.get("FAISS_BUILD_BATCH_SIZE", "512"))  # Reduced for RTX 4090
+BATCH_SIZE = int(os.environ.get("FAISS_BUILD_BATCH_SIZE", "512"))
 NUM_FAISS_THREADS = int(os.environ.get("FAISS_OMP_THREADS", str(os.cpu_count() or 8)))
 
-# IVF-PQ parameters for compression (reduces memory ~40x)
-NLIST = 8192  # Number of clusters (increased for 24M scale)
-M = 64  # Sub-quantizers (must divide 768 evenly: 768/64=12)
-NBITS = 8  # Bits per sub-quantizer
-TRAIN_SIZE = 1_000_000  # Vectors needed for training
+# IVF-PQ parameters for compression
+# With chunking, expect 3-5x more vectors than documents
+NLIST = 16384  # More clusters for larger dataset
+M = 64  # Sub-quantizers (768/64=12)
+NBITS = 8
+TRAIN_SIZE = 2_000_000  # More training samples for better quantization
 
-# Checkpointing (resume from crashes)
-CHECKPOINT_INTERVAL = 500_000  # Save progress every 500k vectors
-CHECKPOINT_PATH = INDEX_DIR / "checkpoint.npz"
+# Checkpointing
+CHECKPOINT_INTERVAL = 500_000
+CHECKPOINT_PATH = INDEX_DIR / "checkpoint_chunked.npz"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
+print(DEVICE)
 
 # -------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------
 def count_lines_fast(path: Path) -> int:
-    """Fast line count for progress bar: each line = one doc."""
+    """Fast line count: each line = one chunk."""
     if not path.exists():
         raise FileNotFoundError(path)
 
@@ -56,13 +56,26 @@ def count_lines_fast(path: Path) -> int:
 
 
 def iter_jsonl(path: Path):
-    """Stream docs from JSONL file."""
+    """Stream chunks from JSONL file."""
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             yield json.loads(line)
+
+
+def estimate_memory_usage(n_vectors: int, method: str = "ivfpq") -> dict:
+    """Estimate index memory usage."""
+    if method == "flat":
+        # 768 dims * 4 bytes per float32
+        size_gb = (n_vectors * 768 * 4) / (1024**3)
+        return {"method": "FlatIP", "size_gb": size_gb}
+    elif method == "ivfpq":
+        # M * NBITS / 8 bytes per vector
+        size_gb = (n_vectors * M * NBITS / 8) / (1024**3)
+        return {"method": "IVF-PQ", "size_gb": size_gb, "compression_ratio": "~30-40x"}
+    return {}
 
 
 # -------------------------------------------------------------------
@@ -75,7 +88,6 @@ if __name__ == "__main__":
     print(f"[INFO] Using device: {DEVICE}")
     print(f"[INFO] Batch size: {BATCH_SIZE}")
     print(f"[INFO] FAISS threads: {NUM_FAISS_THREADS}")
-    print(f"[INFO] RAM available: 60GB (IndexIVFPQ required)")
 
     # Set FAISS to use all CPU cores
     faiss.omp_set_num_threads(NUM_FAISS_THREADS)
@@ -85,19 +97,24 @@ if __name__ == "__main__":
     model.eval()
     print("[INFO] Model loaded.")
 
-    print(f"[INFO] Counting documents in {CORPUS_PATH} ...")
-    total_docs = count_lines_fast(CORPUS_PATH)
-    print(f"[INFO] Total documents: {total_docs:,}")
+    print(f"[INFO] Counting chunks in {CORPUS_PATH} ...")
+    total_chunks = count_lines_fast(CORPUS_PATH)
+    print(f"[INFO] Total chunks: {total_chunks:,}")
+    
+    # Estimate memory
+    mem_estimate = estimate_memory_usage(total_chunks, "ivfpq")
+    print(f"[INFO] Estimated {mem_estimate['method']} index size: ~{mem_estimate['size_gb']:.2f} GB")
+    if "compression_ratio" in mem_estimate:
+        print(f"[INFO] Compression ratio: {mem_estimate['compression_ratio']}")
 
     # Check for checkpoint
     start_from = 0
     if CHECKPOINT_PATH.exists():
         print(f"[INFO] Found checkpoint at {CHECKPOINT_PATH}")
         ckpt = np.load(CHECKPOINT_PATH, allow_pickle=True)
-        start_from = int(ckpt['n_seen'])
-        print(f"[INFO] Resuming from vector {start_from:,}")
+        start_from = int(ckpt.get('valid_chunks_processed', 0))  # Use valid chunks count
+        print(f"[INFO] Resuming from valid chunk {start_from:,}")
         
-        # Load partial index if exists
         if INDEX_OUT_PATH.exists():
             print(f"[INFO] Loading partial index...")
             index = faiss.read_index(str(INDEX_OUT_PATH))
@@ -126,32 +143,37 @@ if __name__ == "__main__":
         meta_fout = META_OUT_PATH.open("a", encoding="utf-8")
 
     batch_texts: list[str] = []
-    doc_counter = 0
+    corpus_line_counter = 0  # Track position in corpus file
+    valid_chunks_processed = 0  # Track number of valid (non-empty) chunks processed
 
-    print("\n[INFO] Building compressed FAISS index (IVF-PQ) ...")
+    print("\n[INFO] Building compressed FAISS index (IVF-PQ) for CHUNKED corpus...")
     print(f"[INFO] Index params: nlist={NLIST}, m={M}, nbits={NBITS}")
-    print(f"[INFO] Estimated index size: ~{(total_docs * M * NBITS / 8) / (1024**3):.2f} GB")
     print(f"[INFO] Will train on first {TRAIN_SIZE:,} vectors\n")
 
-    for doc in tqdm(iter_jsonl(CORPUS_PATH), total=total_docs, unit="docs"):
-        # Skip already processed docs
-        if doc_counter < start_from:
-            doc_counter += 1
-            continue
-
+    for doc in tqdm(iter_jsonl(CORPUS_PATH), total=total_chunks, unit="chunks"):
         text = (doc.get("text") or "").strip()
+        corpus_line_counter += 1
+        
         if not text:
+            # Empty chunk - skip entirely, don't write metadata or embedding
+            continue
+        
+        # Skip already processed valid chunks (for checkpoint resume)
+        if valid_chunks_processed < start_from:
+            valid_chunks_processed += 1
             continue
 
-        # meta is written immediately (no need to keep in RAM)
+        # Write metadata for this valid chunk
         meta = {
             "doc_id": doc.get("doc_id"),
             "source": doc.get("source"),
             "title": doc.get("title"),
+            "meta": doc.get("meta", {}),  # includes chunk_index, total_chunks, etc.
         }
         meta_fout.write(json.dumps(meta, ensure_ascii=False) + "\n")
 
         batch_texts.append(text)
+        valid_chunks_processed += 1
 
         if len(batch_texts) >= BATCH_SIZE:
             with torch.inference_mode():
@@ -161,7 +183,7 @@ if __name__ == "__main__":
                     device=DEVICE,
                     show_progress_bar=False,
                     convert_to_numpy=True,
-                    normalize_embeddings=True,  # cosine via dot product
+                    normalize_embeddings=True,
                 )
 
             if dim is None:
@@ -171,7 +193,7 @@ if __name__ == "__main__":
                 # Create compressed IVF-PQ index
                 quantizer = faiss.IndexFlatIP(dim)
                 index = faiss.IndexIVFPQ(quantizer, dim, NLIST, M, NBITS)
-                print(f"[INFO] Created IndexIVFPQ (memory-efficient)")
+                print(f"[INFO] Created IndexIVFPQ for chunked corpus")
 
             # Phase 1: Accumulate training data
             if not is_trained:
@@ -191,20 +213,20 @@ if __name__ == "__main__":
                     
                     training_vectors.clear()
                     is_trained = True
-                    print(f"[INFO] Added {n_seen:,} vectors. Continuing with remaining data...\n")
+                    print(f"[INFO] Added {n_seen:,} vectors. Continuing...\n")
             else:
                 # Phase 2: Add vectors normally after training
                 index.add(emb.astype("float32"))
                 n_seen += emb.shape[0]
 
             batch_texts.clear()
-            doc_counter += BATCH_SIZE
 
             # Checkpoint every N vectors
             if n_seen > 0 and n_seen % CHECKPOINT_INTERVAL == 0:
                 print(f"\n[INFO] Checkpointing at {n_seen:,} vectors...")
                 faiss.write_index(index, str(INDEX_OUT_PATH))
-                np.savez(CHECKPOINT_PATH, n_seen=n_seen, is_trained=is_trained)
+                np.savez(CHECKPOINT_PATH, n_seen=n_seen, is_trained=is_trained, 
+                        valid_chunks_processed=valid_chunks_processed)
                 meta_fout.flush()
 
     # Process last partial batch
@@ -244,7 +266,7 @@ if __name__ == "__main__":
 
     meta_fout.close()
 
-    print(f"\n[INFO] Total indexed vectors: {n_seen:,}")
+    print(f"\n[INFO] Total indexed vectors (chunks): {n_seen:,}")
     print(f"[INFO] Index memory usage: ~{(n_seen * M * NBITS / 8) / (1024**3):.2f} GB")
     print(f"[INFO] Saving FAISS index to: {INDEX_OUT_PATH}")
     faiss.write_index(index, str(INDEX_OUT_PATH))
@@ -254,4 +276,11 @@ if __name__ == "__main__":
         CHECKPOINT_PATH.unlink()
         print("[INFO] Checkpoint removed.")
     
+    print("\n" + "="*70)
+    print("CHUNKED INDEX BUILD COMPLETE")
+    print("="*70)
+    print(f"Each original document was split into ~3-5 chunks")
+    print(f"This enables retrieval from ANY part of the document")
+    print(f"Trade-off: More storage, but MUCH better recall")
+    print("="*70)
     print("[INFO] Done.")

@@ -170,6 +170,7 @@ class SelfBioRAGGenerator(Generator):
         
         Structure:
         1. Few-shot examples
+        2. ## Context:
         3. ## Question: 
         4. ## Options:
         5. ## Response:
@@ -180,20 +181,15 @@ class SelfBioRAGGenerator(Generator):
         if self.use_few_shot and self.few_shot_examples:
             prompt_parts.append(self.few_shot_examples)
 
-
-        # Add question header, then query (which already includes ## Options:)
-        prompt_parts.append(f"\n## Question:\n{query}")
-
-        # Add response section
-        prompt_parts.append(f"\n## Response:\n")
-
         # Add context with retrieval token if provided
         # Truncate documents to fit within model's 4096 token context limit
         # Reserve: ~1500 tokens for few-shot, ~500 for query, ~500 for generation
         # Remaining: ~1500 tokens for documents (~500 tokens each with top_k=3)
         MAX_DOC_CHARS_PER_DOC = 2500  # ~625 tokens per document
         MAX_TOTAL_CONTEXT_CHARS = 7000  # ~1750 tokens total for all documents
-        
+                # Add context section
+        prompt_parts.append(f"\n## Context:\n")
+
         if context:
             paragraphs = []
             total_chars = 0
@@ -222,6 +218,13 @@ class SelfBioRAGGenerator(Generator):
             
             context_text = "\n\n".join(paragraphs)
             prompt_parts.append(context_text)
+
+        # Add question header, then query (which already includes ## Options:)
+        prompt_parts.append(f"\n## Question:\n{query}")
+
+        # Add response section
+        prompt_parts.append(f"\n## Response:\n")
+
         
         return "".join(prompt_parts)
 

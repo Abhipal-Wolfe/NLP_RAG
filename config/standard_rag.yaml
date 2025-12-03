@@ -10,7 +10,7 @@ retriever:
 
 generator:
   type: VLLMGenerator
-  model_path: "togethercomputer/Llama-2-7B-32K-Instruct"
+  model_path: "meta-llama/Llama-2-7b-hf"
   max_tokens: 200
   temperature: 0.0
   enforce_eager: false  # Enable CUDA graphs for faster generation
