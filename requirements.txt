@@ -1,0 +1,35 @@
+# Core dependencies
+#numpy>=1.24.0,<1.2.6  # faiss-gpu 1.7.4 requires numpy<2.0
+
+# PyTorch with GPU support (CUDA 11.8 - most stable with faiss-gpu 1.7.4)
+# For CUDA 11.8: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#torch>=2.0.0,<2.2.0
+#torchvision>=0.15.0,<0.17.0
+
+# Transformers
+transformers>=4.40.0,<4.45.0
+
+# RAG / Embeddings
+sentence-transformers>=3.0.0,<3.1.0
+
+# FAISS - Install via conda for GPU support
+# conda install -c pytorch -c nvidia faiss-gpu=1.7.4
+# Do NOT install faiss-cpu alongside faiss-gpu (causes conflicts)
+
+# Utilities
+pyyaml>=6.0.0
+tqdm>=4.65.0
+
+# Testing
+pytest>=7.0.0
+
+# Additional dependencies for sentence-transformers
+huggingface-hub>=0.19.0
+safetensors>=0.4.0
+tokenizers>=0.15.0
+
+# For datasets loading
+datasets>=2.14.0
+
+# For KG triplet extraction
+vllm>=0.4.0  
