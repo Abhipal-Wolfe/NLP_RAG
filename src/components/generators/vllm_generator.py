@@ -66,6 +66,7 @@ class VLLMGenerator(Generator):
         self,
         query: str,
         context: Optional[List[Document]] = None,
+        raw: bool = False,
         **kwargs
     ) -> GenerationResult:
         """
@@ -74,18 +75,20 @@ class VLLMGenerator(Generator):
         Args:
             query: Question or instruction
             context: Retrieved documents (optional)
+            raw: If True, use query as-is without formatting (no few-shot examples)
             **kwargs: Additional arguments
 
         Returns:
             GenerationResult with answer
         """
-        results = self.generate_batch([query], [context] if context else None, **kwargs)
+        results = self.generate_batch([query], [context] if context else None, raw=raw, **kwargs)
         return results[0]
 
     def generate_batch(
         self,
         queries: List[str],
         contexts: Optional[List[List[Document]]] = None,
+        raw: bool = False,
         **kwargs
     ) -> List[GenerationResult]:
         """
@@ -94,6 +97,7 @@ class VLLMGenerator(Generator):
         Args:
             queries: List of questions
             contexts: List of context documents per query (optional)
+            raw: If True, use queries as-is without formatting (no few-shot examples)
             **kwargs: Additional arguments
 
         Returns:
@@ -102,9 +106,14 @@ class VLLMGenerator(Generator):
         # Format prompts
         prompts = []
         for i, query in enumerate(queries):
-            context_docs = contexts[i] if contexts and i < len(contexts) else None
-            prompt = self._format_prompt(query, context_docs)
-            prompts.append(prompt)
+            if raw:
+                # Use query as-is (for query rewriting, etc.)
+                prompts.append(query)
+            else:
+                # Apply few-shot formatting
+                context_docs = contexts[i] if contexts and i < len(contexts) else None
+                prompt = self._format_prompt(query, context_docs)
+                prompts.append(prompt)
 
         # Generate
         max_tokens = kwargs.get("max_tokens", self.max_tokens)

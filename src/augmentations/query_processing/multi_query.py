@@ -92,7 +92,8 @@ def generate_rewritten_queries(
             print(f"  " + "-"*70)
         
         try:
-            result = generator.generate(prompt, context=None)
+            # Use raw=True to bypass few-shot formatting (avoid "Answer:" pattern)
+            result = generator.generate(prompt, context=None, raw=True)
             raw_output = result.answer
             rewritten = raw_output.strip()
             

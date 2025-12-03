@@ -30,7 +30,6 @@ def main():
     # Use command-line arg if provided, otherwise use config value
     max_samples = args.max_samples if args.max_samples is not None else config.get("max_samples")
     data = loader.load_dataset(config["dataset"], max_samples=max_samples)
-    data = data[2:10]
     
     # Format questions with options (moved to prompts.py)
     queries = [format_question_with_options(item) for item in data]
@@ -106,6 +105,8 @@ def main():
                 print(f"\nGround truth: {ground_truths[i].get('answer_idx')}")
 
             # Stage 1: Query processing
+            # Keep original query for generation, use rewritten queries only for retrieval
+            original_query = query  # Save original for final generation
             processed = [query]
             if verbose and i == 0 and augmentations.get("query"):
                 print(f"\n[STAGE 1: QUERY PROCESSING]")
@@ -256,7 +257,8 @@ def main():
                         for j, doc in enumerate(documents[:5]):
                             print(f"    Doc {j+1} - Score: {doc.metadata.get('score', 'N/A')}")
                     
-                    documents, aug_metadata = aug(processed[0], documents, {}, ctx)
+                    # Use ORIGINAL query for reranking (rank by relevance to original question)
+                    documents, aug_metadata = aug(original_query, documents, {}, ctx)
                     
                     if verbose and i == 0:
                         print("  After:")
@@ -290,15 +292,19 @@ def main():
                     print(f"\nDocuments after reranking: {len(documents)}")
 
             # Stage 4: Generation
+            # Use ORIGINAL query (not rewritten) for final generation
+            # Rewritten queries were only for retrieval diversity
             if verbose and i == 0:
-                print(f"Context: {'WITH DOCUMENTS' if documents else 'NO DOCUMENTS'}")
+                print(f"\n[STAGE 4: GENERATION]")
+                print(f"Context: {'WITH ' + str(len(documents)) + ' DOCUMENTS' if documents else 'NO DOCUMENTS'}")
+                print(f"Using ORIGINAL query for generation (not rewritten queries)")
                 print(f"\n[PROMPT]")
                 # Show the formatted prompt (generator will format it internally)
-                formatted_prompt = components["generator"]._format_prompt(processed[0], documents)
+                formatted_prompt = components["generator"]._format_prompt(original_query, documents)
                 print(formatted_prompt)
             
-            # Pass query and documents to generator (it will format internally)
-            generation_result = components["generator"].generate(processed[0], context=documents)
+            # Pass ORIGINAL query and documents to generator
+            generation_result = components["generator"].generate(original_query, context=documents)
             answer = generation_result.answer
 
             # Stage 5: Reflection
@@ -316,7 +322,7 @@ def main():
                         print(f"\nAugmentation {aug_idx+1}: {aug_name}")
                     
                     old_answer = answer
-                    answer, aug_metadata = aug(processed[0], answer, documents, {}, ctx)
+                    answer, aug_metadata = aug(original_query, answer, documents, {}, ctx)
                     
                     if verbose and i == 0:
                         if aug_metadata and isinstance(aug_metadata, dict):

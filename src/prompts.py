@@ -129,18 +129,42 @@ def format_query_rewrite_gqr(question: str) -> str:
     GQR - General Query Rewrite (Few-shot)
     Clean, well-formed search query version.
     """
-    return f"""Rewrite the medical question as a clean search query.
+    return f"""
+# Instruction:
+You rewrite clinical questions into **clean, information-preserving search queries**
+optimized for biomedical retrieval systems. Maintain all important entities,
+symptoms, labs, durations, and constraints. Remove filler words, speculation,
+and question phrasing.
 
-Example 1:
-Question: A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
-Search query: fatigue weight gain cold intolerance elevated TSH low T4 diagnosis
+# Format:
+Search query: <rewritten_query>
 
-Example 2:
-Question: A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
-Search query: recurrent bacterial infections child low immunoglobulins absent B cells diagnosis
+# Examples:
+## Question: 
+A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
 
-Question: {question}
-Search query:"""
+## Response:
+Search query: 35-year-old woman fatigue weight gain cold intolerance dry skin elevated TSH low free T4 diagnosis
+
+
+## Question: 
+A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+
+## Response:
+Search query: 2-year-old boy recurrent bacterial infections low IgG IgA IgM absent CD19 B cells diagnosis
+
+
+## Question:
+A smoker with chronic cough and digital clubbing develops a cavitary lung lesion in the upper lobe. AFB stain is positive. What is the likely disease?
+
+##Response:
+Search query: smoker chronic cough digital clubbing cavitary upper lobe lesion positive AFB likely disease
+
+## Question: 
+{question}
+
+## Response:
+Search query: """
 
 
 def format_query_rewrite_kwr(question: str) -> str:
@@ -148,18 +172,43 @@ def format_query_rewrite_kwr(question: str) -> str:
     KWR - Keyword Rewrite (Few-shot)
     Extract key medical terms as keywords.
     """
-    return f"""Extract medical keywords from the question.
+    return f"""
+# Instruction:
+Extract the essential medical keywords from the question. 
+Include all important entities, symptoms, signs, lab abnormalities, imaging findings,
+pathogens, durations, and demographic details. Remove stopwords, filler text,
+and question phrasing. Do NOT add new information or infer diagnoses.
 
-Example 1:
-Question: A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
-Keywords: fatigue weight gain cold intolerance TSH elevated T4 low hypothyroidism
+# Format:
+Search query: <keyword_list>
 
-Example 2:
-Question: A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
-Keywords: recurrent infections child immunodeficiency IgG IgA IgM B cells agammaglobulinemia
+# Examples:
+## Question:
+A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
 
-Question: {question}
-Keywords:"""
+## Response:
+Search query: 35-year-old woman fatigue weight gain cold intolerance elevated TSH low free T4
+
+
+## Question:
+A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+
+## Response:
+Search query: 2-year-old boy recurrent bacterial infections low IgG IgA IgM absent B cells
+
+
+## Question:
+A smoker with chronic cough and digital clubbing develops a cavitary upper lobe lung lesion. AFB stain is positive. What is the likely disease?
+
+## Response:
+Search query: smoker chronic cough digital clubbing cavitary upper lobe lung lesion positive AFB
+
+
+## Question:
+{question}
+
+## Response:
+Search query: """
 
 
 def format_query_rewrite_par(question: str) -> str:
@@ -167,18 +216,47 @@ def format_query_rewrite_par(question: str) -> str:
     PAR - Pseudo-Answer Rewrite (Few-shot)
     Include likely diagnosis/answer terms in search query.
     """
-    return f"""Create search query including the likely answer/diagnosis.
+    return f"""
+# Instruction:
+Generate a medically-informed search query that includes **likely diagnoses or answer terms**, 
+based on the clinical information in the question. 
+You may make a brief, evidence-based guess at the underlying disease or condition, 
+but do NOT add unrelated facts or invent missing data. 
+The goal is to create a search query that includes:
+- key symptoms and findings
+- important labs or imaging
+- AND a small set of plausible diagnoses
 
-Example 1:
-Question: A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
-Search query: primary hypothyroidism elevated TSH low T4 fatigue weight gain cold intolerance Hashimoto
+# Format:
+Search query: <query_with_likely_diagnosis_terms>
 
-Example 2:
-Question: A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
-Search query: Bruton agammaglobulinemia X-linked absent B cells low immunoglobulins recurrent infections
+# Examples:
+## Question:
+A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
 
-Question: {question}
-Search query:"""
+## Response:
+Search query: primary hypothyroidism Hashimoto fatigue weight gain cold intolerance elevated TSH low free T4
+
+
+## Question:
+A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+
+## Response:
+Search query: Bruton agammaglobulinemia X-linked immunodeficiency low IgG IgA IgM absent B cells recurrent infections
+
+
+## Question:
+A smoker with chronic cough and digital clubbing develops a cavitary upper lobe lung lesion. AFB stain is positive. What is the likely disease?
+
+## Response:
+Search query: pulmonary tuberculosis cavitary upper lobe lesion chronic cough smoker positive AFB
+
+
+## Question:
+{question}
+
+## Response:
+Search query: """
 
 
 # Mapping for easy access
