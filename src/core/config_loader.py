@@ -239,6 +239,12 @@ def build_components(config: dict) -> dict:
             enforce_eager=gen_cfg.get("enforce_eager", True),
             gpu_memory_utilization=gen_cfg.get("gpu_memory_utilization", 0.7)
         )
+    elif gen_cfg["type"] == "MockGenerator":
+        from ..components.generators.mock_generator import MockGenerator
+        components["generator"] = MockGenerator(
+            model_path=gen_cfg.get("model_path", "mock"),
+            max_tokens=gen_cfg.get("max_tokens", 200)
+        )
 
     # Build evaluator
     components["evaluator"] = AccuracyEvaluator()

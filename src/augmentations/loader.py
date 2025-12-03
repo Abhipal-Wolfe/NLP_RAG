@@ -80,6 +80,18 @@ def load_augmentations(config: Dict[str, Any]) -> Dict[str, List[Callable]]:
                     create_self_reflection_augmentation(max_iterations=max_iterations)
                 )
     
+    # Load generation augmentations
+    for aug_spec in aug_config.get("generation", []):
+        if isinstance(aug_spec, dict):
+            aug_name = list(aug_spec.keys())[0]
+            aug_params = aug_spec.get(aug_name, {})
+            
+            if aug_name == "chain_of_thought":
+                from .generation.chain_of_thought import create_chain_of_thought_augmentation
+                augmentations["generation"].append(
+                    create_chain_of_thought_augmentation()
+                )
+    
     return augmentations
 
 
