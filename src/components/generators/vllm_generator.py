@@ -2,7 +2,15 @@
 
 from typing import List, Optional, Dict, Any
 from transformers import AutoTokenizer
-from vllm import LLM, SamplingParams
+try:
+    from vllm import LLM, SamplingParams
+except ImportError:
+    # Mock for environments without vllm
+    class LLM:
+        def __init__(self, *args, **kwargs): pass
+    class SamplingParams:
+        def __init__(self, *args, **kwargs): pass
+
 from ...core.document import Document
 
 from ...core.interfaces import Generator, GenerationResult

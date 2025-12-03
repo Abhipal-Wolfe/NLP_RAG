@@ -107,6 +107,37 @@ def format_rag_prompt(question: str, context: str, use_few_shot: bool = True) ->
         )
 
 
+def format_cot_prompt_with_options(item: dict) -> str:
+    """
+    Format a simple CoT prompt (question + options, no context) from a dataset item.
+
+    Template:
+        You are a helpful medical expert, and your task is to answer a multi-choice medical question.
+        Please first think step-by-step and then choose the answer from the provided options.
+
+        Question:
+        <QUESTION>
+
+        Options:
+        <OPTIONS>
+    """
+    question = item.get("question", "")
+    options = item.get("options", {})
+
+    options_text = ""
+    if isinstance(options, dict) and options:
+        options_text = "\n".join([f"{k}. {v}" for k, v in sorted(options.items())])
+    elif isinstance(options, (list, tuple)) and options:
+        options_text = "\n".join([f"{chr(ord('A') + idx)}. {opt}" for idx, opt in enumerate(options)])
+
+    return (
+        "You are a helpful medical expert, and your task is to answer a multi-choice medical question.\n"
+        "Please first think step-by-step and then choose the answer from the provided options.\n\n"
+        f"Question:\n{question}\n\n"
+        f"Options:\n{options_text}"
+    )
+
+
 def format_retrieval_decision(question: str) -> str:
     """Format prompt for retrieval decision (Self-BioRAG style)."""
     return (
@@ -422,3 +453,12 @@ if __name__ == "__main__":
     print(f"  Retrieval decision:   {len(retrieval_prompt):,} chars")
     print(f"  Critic reranking:     {len(critic_prompt):,} chars")
     print("="*100)
+
+    # ========================================================================
+    # CoT Prompt Test
+    # ========================================================================
+    print("\n\n" + "="*100)
+    print("CHAIN-OF-THOUGHT PROMPT (question + options)")
+    print("="*100)
+    cot_prompt = format_cot_prompt_with_options(sample_item)
+    print(cot_prompt)

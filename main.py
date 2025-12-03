@@ -39,7 +39,7 @@ def main():
     predictions = []
     
     # Check if we can use batch processing (no retrieval, no augmentations)
-    has_augmentations = any(augmentations.get(k) for k in ["query", "retrieval", "rerank", "reflection"])
+    has_augmentations = any(augmentations.get(k) for k in ["query", "retrieval", "rerank", "reflection", "generation"])
     has_retriever = components.get("retriever") is not None
     use_batch = not has_augmentations and not has_retriever
     
@@ -297,14 +297,38 @@ def main():
             if verbose and i == 0:
                 print(f"\n[STAGE 4: GENERATION]")
                 print(f"Context: {'WITH ' + str(len(documents)) + ' DOCUMENTS' if documents else 'NO DOCUMENTS'}")
-                print(f"Using ORIGINAL query for generation (not rewritten queries)")
+            
+            # Add ground truths to context for CoT augmentation
+            ctx["ground_truths"] = ground_truths
+            
+            # Apply generation augmentations (e.g., CoT)
+            generation_query = original_query
+            generation_kwargs = {}
+            
+            for aug_idx, aug in enumerate(augmentations.get("generation", [])):
+                if verbose and i == 0:
+                    aug_name = getattr(aug, '__name__', str(aug))
+                    print(f"Applying generation augmentation: {aug_name}")
+                
+                # Augmentation returns kwargs (e.g. modified query)
+                aug_kwargs = aug(generation_query, documents, {}, ctx)
+                generation_kwargs.update(aug_kwargs)
+                
+                # If query was modified, update it for subsequent steps
+                if "query" in aug_kwargs:
+                    generation_query = aug_kwargs["query"]
+                    if verbose and i == 0:
+                        print(f"  Query modified by augmentation")
+                        print(f"  New Query: {generation_query[:100]}...")
+
+            if verbose and i == 0:
                 print(f"\n[PROMPT]")
                 # Show the formatted prompt (generator will format it internally)
-                formatted_prompt = components["generator"]._format_prompt(original_query, documents)
+                formatted_prompt = components["generator"]._format_prompt(generation_query, documents)
                 print(formatted_prompt)
             
-            # Pass ORIGINAL query and documents to generator
-            generation_result = components["generator"].generate(original_query, context=documents)
+            # Pass ORIGINAL (or modified) query and documents to generator
+            generation_result = components["generator"].generate(generation_query, context=documents)
             answer = generation_result.answer
 
             # Stage 5: Reflection
