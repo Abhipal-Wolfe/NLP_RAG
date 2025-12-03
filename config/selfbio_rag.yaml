@@ -13,6 +13,8 @@ generator:
   model_path: "dmis-lab/selfbiorag_7b"
   max_tokens: 500
   temperature: 0.0
+  enforce_eager: true  # Disable CUDA graphs for more stable initialization
+  gpu_memory_utilization: 0.85  # Higher = more memory available for KV cache
 
 # Self-BioRAG augmentations
 augmentations:

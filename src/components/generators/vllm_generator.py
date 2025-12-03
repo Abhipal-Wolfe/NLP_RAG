@@ -36,6 +36,7 @@ class VLLMGenerator(Generator):
         enforce_eager: bool = True,
         download_dir: Optional[str] = None,
         use_few_shot: bool = True,
+        use_cot: bool = False,
         dataset_name: str = "med_qa",
         few_shot_examples: Optional[str] = None
     ):
@@ -50,6 +51,7 @@ class VLLMGenerator(Generator):
             enforce_eager: Disable CUDA graphs
             download_dir: Model download directory
             use_few_shot: Whether to use few-shot examples
+            use_cot: Whether to use Chain-of-Thought prompting
             dataset_name: Dataset name for few-shot examples
             few_shot_examples: Custom few-shot examples string
         """
@@ -66,6 +68,7 @@ class VLLMGenerator(Generator):
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.use_few_shot = use_few_shot
+        self.use_cot = use_cot
         self.dataset_name = dataset_name
         self.few_shot_examples = few_shot_examples
         self.model_path = model_path
@@ -151,7 +154,7 @@ class VLLMGenerator(Generator):
 
     def _format_prompt(self, query: str, context: Optional[List[Document]] = None) -> str:
         """Format prompt with optional context and few-shot examples"""
-        from ...prompts import format_question, format_rag_prompt
+        from ...prompts import format_question, format_cot_question, format_rag_prompt
         
         # Truncate documents to fit within model's context limit
         # Reserve: ~1500 tokens for few-shot, ~500 for query, ~500 for generation
@@ -183,7 +186,10 @@ class VLLMGenerator(Generator):
             return format_rag_prompt(query, context_text, use_few_shot=self.use_few_shot)
         else:
             # Baseline mode: format without context
-            return format_question(query, use_few_shot=self.use_few_shot)
+            if self.use_cot:
+                return format_cot_question(query, use_few_shot=self.use_few_shot)
+            else:
+                return format_question(query, use_few_shot=self.use_few_shot)
 
     def _postprocess(self, answer: str) -> str:
         """Clean up generated answer"""

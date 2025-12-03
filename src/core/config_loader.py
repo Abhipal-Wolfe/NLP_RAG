@@ -229,7 +229,9 @@ def build_components(config: dict) -> dict:
             max_tokens=gen_cfg.get("max_tokens", 200),
             temperature=gen_cfg.get("temperature", 0.0),
             enforce_eager=gen_cfg.get("enforce_eager", True),
-            gpu_memory_utilization=gen_cfg.get("gpu_memory_utilization", 0.7)
+            gpu_memory_utilization=gen_cfg.get("gpu_memory_utilization", 0.7),
+            use_few_shot=gen_cfg.get("use_few_shot", True),  # Default: use few-shot examples
+            use_cot=gen_cfg.get("use_cot", False)  # Default: standard format (not CoT)
         )
     elif gen_cfg["type"] == "SelfBioRAGGenerator":
         components["generator"] = SelfBioRAGGenerator(

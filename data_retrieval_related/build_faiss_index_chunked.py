@@ -1,4 +1,5 @@
 import json
+import multiprocessing
 import os
 from pathlib import Path
 
@@ -23,8 +24,17 @@ META_OUT_PATH = INDEX_DIR / "med_faiss_chunked_meta.jsonl"
 MODEL_NAME = "NeuML/pubmedbert-base-embeddings"
 
 # Tune these for speed vs memory
-BATCH_SIZE = int(os.environ.get("FAISS_BUILD_BATCH_SIZE", "512"))
-NUM_FAISS_THREADS = int(os.environ.get("FAISS_OMP_THREADS", str(os.cpu_count() or 8)))
+# OPTIMIZATION TIPS:
+# - Batch size: Larger = faster GPU utilization but more memory (64, 128, 256, 512)
+#   For 24GB+ GPU: Try 256-512. For 8-16GB: Use 128-256.
+# - FAISS threads: More = faster index building (uses all CPU cores by default)
+#   Set FAISS_OMP_THREADS env var to override (e.g., export FAISS_OMP_THREADS=23)
+# - Accumulation batches: Accumulate N batches before adding to FAISS (faster)
+#   Larger = faster but more memory (try 4-8 batches)
+BATCH_SIZE = int(os.environ.get("FAISS_BUILD_BATCH_SIZE", "256"))
+NUM_ACCUMULATE_BATCHES = int(os.environ.get("FAISS_ACCUMULATE_BATCHES", "4"))  # Accumulate 4 batches before adding
+# Use all available CPU cores (leave 1 for system to avoid overloading)
+NUM_FAISS_THREADS = int(os.environ.get("FAISS_OMP_THREADS", str(multiprocessing.cpu_count() - 2)))
 
 # IVF-PQ parameters for compression
 # With chunking, expect 3-5x more vectors than documents
@@ -145,10 +155,15 @@ if __name__ == "__main__":
     batch_texts: list[str] = []
     corpus_line_counter = 0  # Track position in corpus file
     valid_chunks_processed = 0  # Track number of valid (non-empty) chunks processed
+    
+    # Accumulate multiple batches before adding to FAISS (much faster)
+    accumulated_embeddings = []
+    accumulated_count = 0
 
     print("\n[INFO] Building compressed FAISS index (IVF-PQ) for CHUNKED corpus...")
     print(f"[INFO] Index params: nlist={NLIST}, m={M}, nbits={NBITS}")
-    print(f"[INFO] Will train on first {TRAIN_SIZE:,} vectors\n")
+    print(f"[INFO] Will train on first {TRAIN_SIZE:,} vectors")
+    print(f"[INFO] Accumulating {NUM_ACCUMULATE_BATCHES} batches before adding to FAISS (faster)\n")
 
     for doc in tqdm(iter_jsonl(CORPUS_PATH), total=total_chunks, unit="chunks"):
         text = (doc.get("text") or "").strip()
@@ -215,9 +230,18 @@ if __name__ == "__main__":
                     is_trained = True
                     print(f"[INFO] Added {n_seen:,} vectors. Continuing...\n")
             else:
-                # Phase 2: Add vectors normally after training
-                index.add(emb.astype("float32"))
-                n_seen += emb.shape[0]
+                # Phase 2: Accumulate batches before adding (much faster)
+                accumulated_embeddings.append(emb.astype("float32"))
+                accumulated_count += 1
+                
+                # Add accumulated batches when we have enough
+                if accumulated_count >= NUM_ACCUMULATE_BATCHES:
+                    # Stack all accumulated embeddings and add at once
+                    combined_emb = np.vstack(accumulated_embeddings)
+                    index.add(combined_emb)
+                    n_seen += combined_emb.shape[0]
+                    accumulated_embeddings.clear()
+                    accumulated_count = 0
 
             batch_texts.clear()
 
@@ -259,10 +283,18 @@ if __name__ == "__main__":
                     n_seen += vec_batch.shape[0]
                 training_vectors.clear()
         else:
-            index.add(emb.astype('float32'))
-            n_seen += emb.shape[0]
+            # Add to accumulated batch
+            accumulated_embeddings.append(emb.astype('float32'))
         
         batch_texts.clear()
+    
+    # Add any remaining accumulated embeddings after training
+    if is_trained and accumulated_embeddings:
+        combined_emb = np.vstack(accumulated_embeddings)
+        index.add(combined_emb)
+        n_seen += combined_emb.shape[0]
+        print(f"[INFO] Added final {combined_emb.shape[0]:,} accumulated vectors")
+        accumulated_embeddings.clear()
 
     meta_fout.close()
 

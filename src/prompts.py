@@ -46,6 +46,66 @@ Answer: C. Small cell lung cancer
 Explanation: The key diagnostic features are the central location, smoking history, and histology showing "small blue cells" (small round cells with scant cytoplasm and hyperchromatic nuclei). Small cell lung cancer is strongly associated with smoking, typically presents centrally, and has characteristic neuroendocrine histology.
 """
 
+FEW_SHOT_COT = """You are a medical expert. Think step-by-step before selecting the best answer.
+
+# Format:
+Answer: <LETTER>. <option text>
+Step 1: [First reasoning step]
+Step 2: [Second reasoning step]
+Step N: [Nth reasoning step]
+
+# Examples:
+## Question:
+A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
+
+## Options:
+A. Hyperthyroidism
+B. Primary hypothyroidism
+C. Secondary hypothyroidism
+D. Euthyroid sick syndrome
+
+## Response:
+Answer: B. Primary hypothyroidism
+Step 1: The patient has fatigue, weight gain, and cold intolerance - these are classic symptoms of hypothyroidism (underactive thyroid).
+Step 2: Lab findings show elevated TSH and low free T4. In primary hypothyroidism, the thyroid fails, causing low T4, which triggers the pituitary to produce more TSH.
+Step 3: In secondary hypothyroidism, both TSH and T4 would be low (pituitary problem). Here TSH is elevated, ruling this out.
+Step 4: Euthyroid sick syndrome typically shows low T3 with normal or low TSH in acutely ill patients - doesn't fit this presentation.
+
+## Question:
+A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+
+## Options:
+A. DiGeorge syndrome
+B. Bruton agammaglobulinemia
+C. Selective IgA deficiency
+D. Chronic granulomatous disease
+
+## Response:
+Answer: B. Bruton agammaglobulinemia
+Step 1: Key findings are recurrent bacterial infections, absent B cells, and pan-hypogammaglobulinemia (low IgG, IgA, IgM).
+Step 2: DiGeorge syndrome affects T cells (thymic aplasia), not B cells - ruled out.
+Step 3: Selective IgA deficiency only affects IgA, not all immunoglobulins - ruled out.
+Step 4: Chronic granulomatous disease affects neutrophil function, not antibody production - ruled out.
+Step 5: Bruton agammaglobulinemia (X-linked) causes arrested B cell development, leading to absent B cells and no immunoglobulin production. This matches perfectly.
+
+## Question:
+A 60-year-old smoker has a chronic cough and weight loss. Chest X-ray shows a central mass. Biopsy shows small blue cells. What is the most likely diagnosis?
+
+## Options:
+A. Adenocarcinoma
+B. Squamous cell carcinoma
+C. Small cell lung cancer
+D. Large cell carcinoma
+
+## Response:
+Answer: C. Small cell lung cancer
+Step 1: Patient is a 60-year-old smoker with cough and weight loss - high risk for lung cancer.
+Step 2: The mass is centrally located. Central lung cancers are typically small cell or squamous cell carcinoma.
+Step 3: Biopsy shows "small blue cells" - this is the classic histologic description of small cell lung cancer (neuroendocrine tumor with scant cytoplasm).
+Step 4: Adenocarcinoma is typically peripheral and shows glandular pattern - doesn't match.
+Step 5: Squamous cell has keratinization and intercellular bridges - "small blue cells" is not its characteristic appearance.
+"""
+
 
 def format_question_with_options(item: dict) -> str:
     """Extract question and format with options from dataset item.
@@ -81,6 +141,28 @@ def format_question(question: str, use_few_shot: bool = True) -> str:
         return f"{instruction}## Question:\n{question}\n\n## Response:\n"
 
 
+def format_cot_question(question: str, use_few_shot: bool = True) -> str:
+    """Format question with Chain-of-Thought few-shot examples.
+
+    Expectation: model should output step-by-step reasoning then answer:
+    Answer: <LETTER>. <option text>
+    Step 1: ...
+    Step 2: ...
+    """
+    if use_few_shot:
+        return f"{FEW_SHOT_COT}\n\n## Question:\n{question}\n\n## Response:\n"
+    else:
+        instruction = (
+            "You are a medical expert. Think step-by-step before selecting the best answer.\n"
+            "# Format:\n"
+            "Answer: <LETTER>. <option text>\n"
+            "Step 1: [First reasoning step]\n"
+            "Step 2: [Second reasoning step]\n"
+            "...\n\n"
+        )
+        return f"{instruction}## Question:\n{question}\n\n## Response:\n"
+
+
 def format_rag_prompt(question: str, context: str, use_few_shot: bool = True) -> str:
     """Format RAG prompt with retrieved context.
 
@@ -107,19 +189,16 @@ def format_rag_prompt(question: str, context: str, use_few_shot: bool = True) ->
         )
 
 
-def format_cot_prompt_with_options(item: dict) -> str:
+def format_cot_prompt_with_options(item: dict, use_few_shot: bool = True) -> str:
     """
-    Format a simple CoT prompt (question + options, no context) from a dataset item.
+    Format a CoT (Chain of Thought) prompt with step-by-step reasoning.
 
-    Template:
-        You are a helpful medical expert, and your task is to answer a multi-choice medical question.
-        Please first think step-by-step and then choose the answer from the provided options.
+    Args:
+        item: Dataset item with 'question' and optionally 'options' fields
+        use_few_shot: Whether to include few-shot examples
 
-        Question:
-        <QUESTION>
-
-        Options:
-        <OPTIONS>
+    Returns:
+        Formatted prompt string
     """
     question = item.get("question", "")
     options = item.get("options", {})
@@ -130,12 +209,28 @@ def format_cot_prompt_with_options(item: dict) -> str:
     elif isinstance(options, (list, tuple)) and options:
         options_text = "\n".join([f"{chr(ord('A') + idx)}. {opt}" for idx, opt in enumerate(options)])
 
-    return (
-        "You are a helpful medical expert, and your task is to answer a multi-choice medical question.\n"
-        "Please first think step-by-step and then choose the answer from the provided options.\n\n"
-        f"Question:\n{question}\n\n"
-        f"Options:\n{options_text}"
-    )
+    if use_few_shot:
+        return (
+            f"{FEW_SHOT_COT}\n\n"
+            f"## Question:\n{question}\n\n"
+            f"## Options:\n{options_text}\n\n"
+            f"## Response:\n"
+        )
+    else:
+        instruction = (
+            "You are a medical expert. Think step-by-step before selecting the best answer.\n"
+            "# Format:\n"
+            "Answer: <LETTER>. <option text>\n"
+            "Step 1: [First reasoning step]\n"
+            "Step 2: [Second reasoning step]\n"
+            "...\n"
+        )
+        return (
+            f"{instruction}"
+            f"## Question:\n{question}\n\n"
+            f"## Options:\n{options_text}\n\n"
+            f"## Response:\n"
+        )
 
 
 def format_retrieval_decision(question: str) -> str:
@@ -387,8 +482,16 @@ if __name__ == "__main__":
     rag_prompt = format_rag_prompt(formatted_question, sample_context, use_few_shot=True)
     print(rag_prompt)
     
-    print("\n\n4. EXPECTED MODEL OUTPUT:")
+    # Test CoT prompt
+    print("\n\n4. COT PROMPT (Chain of Thought, with few-shot):")
     print("-"*100)
+    cot_prompt = format_cot_prompt_with_options(sample_item, use_few_shot=True)
+    print(cot_prompt)
+    
+    print("\n\n5. EXPECTED MODEL OUTPUT:")
+    print("-"*100)
+    print("Step 1: Patient is a chronic alcoholic with confusion, ataxia, and ophthalmoplegia - classic Wernicke triad.")
+    print("Step 2: Wernicke encephalopathy is caused by thiamine (B1) deficiency...")
     print("Answer: A. Vitamin B1 (Thiamine)")
     print("\n(The evaluator looks for 'Answer:' prefix and extracts the letter)")
     
@@ -402,19 +505,19 @@ if __name__ == "__main__":
     # Medical question for testing
     medical_question = "A 45-year-old man with chronic alcohol use presents with confusion, ataxia, and ophthalmoplegia. What vitamin deficiency is most likely?"
     
-    print("\n5. GQR - General Query Rewrite:")
+    print("\n6. GQR - General Query Rewrite:")
     print("-"*100)
     gqr_prompt = format_query_rewrite_gqr(medical_question)
     print(gqr_prompt)
     print("\nExpected: What vitamin deficiency causes confusion, ataxia, and ophthalmoplegia in chronic alcohol users?")
     
-    print("\n\n6. KWR - Keyword Rewrite:")
+    print("\n\n7. KWR - Keyword Rewrite:")
     print("-"*100)
     kwr_prompt = format_query_rewrite_kwr(medical_question)
     print(kwr_prompt)
     print("\nExpected: vitamin deficiency confusion ataxia ophthalmoplegia chronic alcohol")
     
-    print("\n\n7. PAR - Pseudo-Answer Rewrite:")
+    print("\n\n8. PAR - Pseudo-Answer Rewrite:")
     print("-"*100)
     par_prompt = format_query_rewrite_par(medical_question)
     print(par_prompt)
@@ -427,13 +530,13 @@ if __name__ == "__main__":
     print("Self-BioRAG: Retrieval Decision & Critic Prompts")
     print("="*100)
     
-    print("\n8. RETRIEVAL DECISION PROMPT:")
+    print("\n9. RETRIEVAL DECISION PROMPT:")
     print("-"*100)
     retrieval_prompt = format_retrieval_decision(formatted_question)
     print(retrieval_prompt)
     print("\nExpected output: [Retrieval] or [No Retrieval]")
     
-    print("\n\n9. CRITIC RERANKING PROMPT:")
+    print("\n\n10. CRITIC RERANKING PROMPT:")
     print("-"*100)
     critic_prompt = format_critic_prompt(formatted_question, sample_context, "Wernicke Encephalopathy")
     print(critic_prompt)
@@ -447,6 +550,7 @@ if __name__ == "__main__":
     print("="*100)
     print(f"  Baseline prompt:      {len(baseline_prompt):,} chars")
     print(f"  RAG prompt:           {len(rag_prompt):,} chars")
+    print(f"  CoT prompt:           {len(cot_prompt):,} chars")
     print(f"  GQR (General):        {len(gqr_prompt):,} chars")
     print(f"  KWR (Keyword):        {len(kwr_prompt):,} chars")
     print(f"  PAR (Pseudo-Answer):  {len(par_prompt):,} chars")

@@ -8,6 +8,8 @@ generator:
   temperature: 0.0
   enforce_eager: false  # Enable CUDA graphs for faster generation
   gpu_memory_utilization: 0.85  # Use more GPU memory for KV cache
+  use_few_shot: true   # Use standard few-shot examples (FEW_SHOT_MEDQA)
+  use_cot: false       # Use standard format (not Chain-of-Thought)
 
 # No retriever
 retriever: null
