@@ -1,0 +1,44 @@
+# Self-BioRAG using unified pipeline with augmentations
+
+# Retriever + Self-BioRAG Generator
+retriever:
+  type: FAISSRetriever
+  top_k: 10
+  faiss_index_paths: "data/index/med_faiss.index"
+  articles_paths: "data/corpus/med_pure_corpus.jsonl"
+  metadata_paths: "data/index/med_faiss_meta.jsonl"
+
+generator:
+  type: SelfBioRAGGenerator
+  model_path: "dmis-lab/selfbiorag_7b"
+  max_tokens: 500
+  temperature: 0.0
+  enforce_eager: true  # Disable CUDA graphs for more stable initialization
+  gpu_memory_utilization: 0.85  # Higher = more memory available for KV cache
+
+# Self-BioRAG augmentations
+augmentations:
+  query: []  # No query decomposition
+
+  retrieval:  # Adaptive retrieval decision
+    - adaptive_retrieval:
+        threshold: 0.5
+
+  rerank:  # Critic-based reranking
+    - critic_reranker:
+        top_k: 3
+        w_rel: 1.0
+        w_sup: 1.0
+        w_use: 0.5
+
+  generation: []  # Standard generation
+
+  reflection:  # Self-reflection loop
+    - self_reflection:
+        max_iterations: 3
+
+# Dataset
+dataset: "eval_datasets/medqa_test.jsonl"
+max_samples: null
+verbose: true  # Print detailed logs (prompts, documents, predictions)
+output_path: "predictions/selfbio_rag"

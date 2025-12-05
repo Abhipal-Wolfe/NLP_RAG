@@ -1,0 +1,31 @@
+# Baseline LLM with Chain-of-Thought prompting
+# Same as baseline_llm.yaml but uses CoT few-shot examples (step-by-step reasoning)
+
+# Generator with CoT prompting enabled
+generator:
+  type: VLLMGenerator
+  model_path: "meta-llama/Llama-2-7b-hf"
+  max_tokens: 400  # More tokens for step-by-step reasoning
+  temperature: 0.0
+  enforce_eager: false
+  gpu_memory_utilization: 0.85
+  use_few_shot: true  # Use few-shot examples (FEW_SHOT_COT)
+  use_cot: true       # Use Chain-of-Thought format with step-by-step reasoning
+
+# No retriever
+retriever: null
+
+# No augmentations (CoT is handled via use_cot flag in generator)
+augmentations:
+  query: []
+  retrieval: []
+  rerank: []
+  generation: []
+  reflection: []
+
+# Dataset
+dataset: "eval_datasets/medqa_test.jsonl"
+max_samples: null
+batch_size: 512
+verbose: true
+output_path: "predictions/baseline_llm_cot"

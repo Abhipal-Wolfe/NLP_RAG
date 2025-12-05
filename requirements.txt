@@ -1,0 +1,24 @@
+numpy>=1.24.0
+
+# PyTorch with GPU support (CUDA)
+# For Windows/Linux with CUDA 12.1: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+torch>=2.0.0
+torchvision>=0.15.0
+
+transformers==4.57.3 # updated to be compatible with sentence-transformers
+
+# RAG / Embeddings
+sentence-transformers==5.1.2 # pinned to the version in your current environment
+datasets==2.19.1
+
+# FAISS - faiss-cpu is more reliably available via pip
+# For GPU support, use faiss-cpu and then enable GPU resources in your code
+faiss-cpu>=1.7.4
+
+pyyaml>=6.0.0
+tqdm>=4.65.0
+vllm==0.11.2 # pinned to the version in your current environment
+numba==0.61.2 # explicitly pin numba to prevent conflicts
+
+pytest>=7.0.0

@@ -1,0 +1,13 @@
+{
+  "predictions": [
+    "A. Disclose the error to the patient and put it in the operative report ## Explanation: The resident should disclose the error to the patient and put it in the operative report. ### Reason 1: The resident should disclose the error to the patient and put it in the operative report. ### Reason 2: The resident should disclose the error to the patient and put it in the operative report. ### Reason 3: The resident should disclose the error to the patient and put it in the operative report. ### Reason 4: The resident should disclose the error to the patient and put it in the operative report. ### Reason 5: The resident should disclose the error to the patient and put it in the operative report. ### Reason 6: The resident should disclose the error to the patient and put it in the operative report. ### Reason 7: The resident should disclose the error to the patient and put it in the operative report. ### Reason 8: The resident should disclose the error to the patient and put it in the operative report. ### Reason 9: The resident should disclose the error to the patient and put it in the operative report. ### Reason 10: The resident should disclose the error to the patient and put it in the operative report. ### Reason 11: The resident should disclose the error to the patient and put it in the operative report. ### Reason 12: The resident should disclose the error to the patient and put it in the operative report. ### Re"
+  ],
+  "metrics": {
+    "choice_match": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 1
+    },
+    "primary_method": "choice_match"
+  }
+}
