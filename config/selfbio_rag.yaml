@@ -3,10 +3,10 @@
 # Retriever + Self-BioRAG Generator
 retriever:
   type: FAISSRetriever
-  top_k: 10
-  faiss_index_paths: "data/index/med_faiss.index"
-  articles_paths: "data/corpus/med_pure_corpus.jsonl"
-  metadata_paths: "data/index/med_faiss_meta.jsonl"
+  top_k: 20
+  faiss_index_paths: "data/index/med_faiss_chunked.index"
+  articles_paths: "data/corpus/med_chunked_corpus.jsonl"
+  metadata_paths: "data/index/med_faiss_chunked_meta.jsonl"
 
 generator:
   type: SelfBioRAGGenerator
@@ -22,11 +22,11 @@ augmentations:
 
   retrieval:  # Adaptive retrieval decision
     - adaptive_retrieval:
-        threshold: 0.5
+        threshold: 0.3
 
   rerank:  # Critic-based reranking
     - critic_reranker:
-        top_k: 3
+        top_k: 5
         w_rel: 1.0
         w_sup: 1.0
         w_use: 0.5

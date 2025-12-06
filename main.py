@@ -1,8 +1,9 @@
 """RAG Evaluation Framework - Domain logic visible in main()"""
 
+import gc
 from src.core.config_loader import load_config, build_components
 from src.data import DatasetLoader
-from src.prompts import format_question_with_options, clean_answer
+from src.prompts import format_question_with_options, clean_answer, extract_answer_part
 from src.utils import save_results
 from src.augmentations.loader import load_augmentations, print_loaded_augmentations
 from tqdm import tqdm
@@ -38,10 +39,18 @@ def main():
     # RAG Pipeline: Query → Retrieval → Rerank → Generate → Reflect
     predictions = []
     
-    # Check if we can use batch processing (no retrieval, no augmentations)
+    # Check processing modes
     has_augmentations = any(augmentations.get(k) for k in ["query", "retrieval", "rerank", "reflection", "generation"])
     has_retriever = components.get("retriever") is not None
+    
+    # Get batch configuration
+    batch_size = config.get("batch_size", 32)
+    use_batched_generation = config.get("use_batched_generation", True)  # Default to True for batched RAG
+    
+    # Batch mode 1: No retrieval, no augmentations (baseline LLM)
     use_batch = not has_augmentations and not has_retriever
+    # Batch mode 2: Has retrieval but no augmentations (batched RAG) - only if enabled in config
+    use_batched_rag = not has_augmentations and has_retriever and use_batched_generation
     
     # Print configuration if verbose
     if verbose:
@@ -61,12 +70,23 @@ def main():
         print(f"  3. Reranking: {len(augmentations.get('rerank', []))} augmentation(s)")
         print(f"  4. Generation: {len(augmentations.get('generation', []))} augmentation(s)")
         print(f"  5. Reflection: {len(augmentations.get('reflection', []))} augmentation(s)")
+        print(f"\nPROCESSING MODE:")
+        if use_batch:
+            print(f"  → Batch Inference (no retrieval, no augmentations)")
+            print(f"  Batch size: {batch_size}")
+        elif use_batched_rag:
+            print(f"  → Batched RAG (sequential retrieval, batched generation)")
+            print(f"  Batch size: {batch_size}")
+        else:
+            print(f"  → Sequential Processing (with augmentations)")
+            if has_retriever and not has_augmentations:
+                print(f"  (Batched generation disabled: use_batched_generation={use_batched_generation})")
         print("="*100 + "\n")
     
     if use_batch:
         # Fast path: Batch process all queries at once
         print(f"Using batch inference for {len(queries)} queries...")
-        batch_size = config.get("batch_size", 32)
+        print(f"Batch size: {batch_size}")
         
         for batch_start in tqdm(range(0, len(queries), batch_size), desc="Batches"):
             batch_end = min(batch_start + batch_size, len(queries))
@@ -84,16 +104,83 @@ def main():
             
             # Batch generate
             batch_results = components["generator"].generate_batch(batch_queries)
-            batch_predictions = [clean_answer(result.answer) for result in batch_results]
+            # Extract only the "Answer: ..." part for saving to JSON
+            batch_predictions = [extract_answer_part(result.answer) for result in batch_results]
             
             if verbose and batch_start == 0:
                 print("\n[OUTPUT 0]")
-                print(batch_results[0].answer)
+                print("Raw output:", batch_results[0].answer)
+                print("Extracted answer part:", batch_predictions[0])
                 sample_data = ground_truths[0]
-                correct = batch_predictions[0] == sample_data.get('answer_idx')
-                print(f"\nPredicted: {batch_predictions[0]} | Expected: {sample_data.get('answer_idx')} | {'✓' if correct else '✗'}\n")
+                # Use evaluator to extract letter for comparison
+                from src.components.evaluators.accuracy_evaluator import AccuracyEvaluator
+                eval_obj = AccuracyEvaluator()
+                pred_letter, _ = eval_obj._parse_prediction(batch_predictions[0])
+                correct = pred_letter == sample_data.get('answer_idx')
+                print(f"\nPredicted: {pred_letter if pred_letter else '(format wrong)'} | Expected: {sample_data.get('answer_idx')} | {'✓' if correct else '✗'}\n")
             
             predictions.extend(batch_predictions)
+    elif use_batched_rag:
+        # Batched RAG: Retrieve and format prompts per batch, then batch generate
+        # This minimizes memory usage by not storing all documents in memory at once
+        print(f"Using batched RAG inference for {len(queries)} queries...")
+        print(f"Batch size: {batch_size}")
+        
+        top_k = config.get("retriever", {}).get("top_k", config.get("top_k", 5))
+        
+        # Process in batches: retrieve -> format prompts -> generate -> clear memory
+        for batch_start in tqdm(range(0, len(queries), batch_size), desc="Batches"):
+            batch_end = min(batch_start + batch_size, len(queries))
+            batch_queries = queries[batch_start:batch_end]
+            
+            # Step 1: Retrieve documents for this batch
+            batch_contexts = []
+            for i, query in enumerate(batch_queries):
+                documents = components["retriever"].retrieve(query, k=top_k).documents
+                batch_contexts.append(documents)
+                
+                if verbose and batch_start == 0 and i == 0:
+                    print(f"\n[QUERY 0]")
+                    print(query)
+                    print(f"\nRetrieved {len(documents)} documents")
+                    for j, doc in enumerate(documents[:3]):
+                        print(f"\n  Doc {j+1}: {doc.page_content[:200]}...")
+            
+            # Step 2: Format prompts immediately (extracts text, documents can be freed)
+            formatted_prompts = []
+            for i, query in enumerate(batch_queries):
+                prompt = components["generator"]._format_prompt(query, batch_contexts[i])
+                formatted_prompts.append(prompt)
+                
+                if verbose and batch_start == 0 and i == 0:
+                    print(f"\n[PROMPT 0]")
+                    print(formatted_prompts[0][:500] + "...")
+            
+            # Step 3: Clear document references to free memory before generation
+            del batch_contexts
+            gc.collect()  # Force garbage collection to free document memory
+            
+            # Step 4: Batch generate using formatted prompts (no document objects needed)
+            # Pass formatted prompts as raw queries (they're already formatted)
+            batch_results = components["generator"].generate_batch(formatted_prompts, contexts=None, raw=True)
+            batch_predictions = [extract_answer_part(result.answer) for result in batch_results]
+            
+            if verbose and batch_start == 0:
+                print(f"\n[OUTPUT 0]")
+                print("Raw output:", batch_results[0].answer)
+                print("Extracted answer part:", batch_predictions[0])
+                sample_data = ground_truths[0]
+                from src.components.evaluators.accuracy_evaluator import AccuracyEvaluator
+                eval_obj = AccuracyEvaluator()
+                pred_letter, _ = eval_obj._parse_prediction(batch_predictions[0])
+                correct = pred_letter == sample_data.get('answer_idx')
+                print(f"\nPredicted: {pred_letter if pred_letter else '(format wrong)'} | Expected: {sample_data.get('answer_idx')} | {'✓' if correct else '✗'}\n")
+            
+            predictions.extend(batch_predictions)
+            
+            # Clear prompts to free memory
+            del formatted_prompts, batch_results
+            gc.collect()
     else:
         # Standard path: Process one by one with retrieval/augmentations
         for i, query in enumerate(tqdm(queries, desc="Processing")):
@@ -372,8 +459,12 @@ def main():
                         else:
                             print(f"  Answer unchanged")
 
+            # Extract only the "Answer: ..." part for saving to JSON
+            answer_part = extract_answer_part(answer)
+            predictions.append(answer_part)
+            
+            # Keep cleaned version for verbose output (includes all content)
             cleaned = clean_answer(answer)
-            predictions.append(cleaned)
             
             if verbose and i == 0:
                 print(f"\n" + "="*100)
@@ -383,19 +474,26 @@ def main():
                 print("\n--- RAW MODEL OUTPUT ---")
                 print(answer)
                 
-                print("\n--- CLEANED PREDICTION ---")
-                print(f"Extracted Answer: {cleaned}")
+                print("\n--- CLEANED PREDICTION (full) ---")
+                print(f"Full cleaned output: {cleaned}")
+                
+                print("\n--- EXTRACTED ANSWER PART (saved to JSON) ---")
+                print(f"Answer part only: {answer_part}")
                 
                 print("\n--- EVALUATION ---")
                 sample_data = ground_truths[i]
-                correct = cleaned == sample_data.get('answer_idx')
+                # Extract letter from answer part for comparison
+                from src.components.evaluators.accuracy_evaluator import AccuracyEvaluator
+                eval_obj = AccuracyEvaluator()
+                pred_letter, _ = eval_obj._parse_prediction(answer_part)
+                correct = pred_letter == sample_data.get('answer_idx')
                 status = "CORRECT" if correct else "INCORRECT"
                 print(f"Status: {status}")
-                print(f"Predicted: {cleaned}")
+                print(f"Predicted letter: {pred_letter if pred_letter else '(format wrong)'}")
                 print(f"Expected:  {sample_data.get('answer_idx')} ({sample_data.get('answer_text')})")
                 
                 if "options" in sample_data and not correct:
-                    pred_text = sample_data["options"].get(cleaned, "N/A")
+                    pred_text = sample_data["options"].get(pred_letter, "N/A") if pred_letter else "N/A (format error)"
                     print(f"\nPredicted was: {pred_text}")
                     print(f"Should have been: {sample_data.get('answer_text')}")
                 

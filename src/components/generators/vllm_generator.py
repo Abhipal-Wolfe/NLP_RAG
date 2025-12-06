@@ -38,7 +38,8 @@ class VLLMGenerator(Generator):
         use_few_shot: bool = True,
         use_cot: bool = False,
         dataset_name: str = "med_qa",
-        few_shot_examples: Optional[str] = None
+        few_shot_examples: Optional[str] = None,
+        max_model_len: Optional[int] = None
     ):
         """
         Args:
@@ -55,15 +56,18 @@ class VLLMGenerator(Generator):
             dataset_name: Dataset name for few-shot examples
             few_shot_examples: Custom few-shot examples string
         """
-        self.model = LLM(
-            model=model_path,
-            download_dir=download_dir,
-            dtype=dtype,
-            tensor_parallel_size=tensor_parallel_size,
-            gpu_memory_utilization=gpu_memory_utilization,
-            enforce_eager=enforce_eager,
-            disable_log_stats=True
-        )
+        llm_kwargs = {
+            "model": model_path,
+            "download_dir": download_dir,
+            "dtype": dtype,
+            "tensor_parallel_size": tensor_parallel_size,
+            "gpu_memory_utilization": gpu_memory_utilization,
+            "enforce_eager": enforce_eager,
+            "disable_log_stats": True
+        }
+        if max_model_len is not None:
+            llm_kwargs["max_model_len"] = max_model_len
+        self.model = LLM(**llm_kwargs)
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.max_tokens = max_tokens
         self.temperature = temperature
@@ -156,32 +160,10 @@ class VLLMGenerator(Generator):
         """Format prompt with optional context and few-shot examples"""
         from ...prompts import format_question, format_cot_question, format_rag_prompt
         
-        # Truncate documents to fit within model's context limit
-        # Reserve: ~1500 tokens for few-shot, ~500 for query, ~500 for generation
-        # With top_k=3: ~500 tokens per document
-        MAX_DOC_CHARS_PER_DOC = 2500  # ~625 tokens per document
-        MAX_TOTAL_CONTEXT_CHARS = 7000  # ~1750 tokens total for all documents
-        
         # Use proper prompt templates from prompts.py
         if context:
-            # RAG mode: format with context (truncated)
-            context_parts = []
-            total_chars = 0
-            
-            for doc in context:
-                content = doc.page_content
-                
-                # Truncate individual document if too long
-                if len(content) > MAX_DOC_CHARS_PER_DOC:
-                    content = content[:MAX_DOC_CHARS_PER_DOC] + "... [truncated]"
-                
-                # Check if adding this document would exceed total limit
-                if total_chars + len(content) > MAX_TOTAL_CONTEXT_CHARS:
-                    break
-                
-                total_chars += len(content)
-                context_parts.append(content)
-            
+            # RAG mode: format with context
+            context_parts = [doc.page_content for doc in context]
             context_text = "\n\n".join(context_parts)
             return format_rag_prompt(query, context_text, use_few_shot=self.use_few_shot)
         else:

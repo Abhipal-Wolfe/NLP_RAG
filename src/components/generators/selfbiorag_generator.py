@@ -190,33 +190,16 @@ class SelfBioRAGGenerator(Generator):
             prompt_parts.append(self.few_shot_examples)
 
         # Add context with retrieval token if provided
-        # Truncate documents to fit within model's 4096 token context limit
-        # Reserve: ~1500 tokens for few-shot, ~500 for query, ~500 for generation
-        # Remaining: ~1500 tokens for documents (~500 tokens each with top_k=3)
-        MAX_DOC_CHARS_PER_DOC = 2500  # ~625 tokens per document
-        MAX_TOTAL_CONTEXT_CHARS = 7000  # ~1750 tokens total for all documents
-                # Add context section
+        # Add context section
+        prompt_parts.append(f"\n# Now answer the following question.\n")
         prompt_parts.append(f"\n## Context:\n")
 
         if context:
             paragraphs = []
-            total_chars = 0
             
             for doc in context:
                 title = doc.metadata.get('title', '')
                 content = doc.page_content
-                
-                # Truncate individual document if too long
-                if len(content) > MAX_DOC_CHARS_PER_DOC:
-                    content = content[:MAX_DOC_CHARS_PER_DOC] + "... [truncated]"
-                
-                # Check if adding this document would exceed total limit
-                doc_text = f"{title}\n{content}" if title else content
-                if total_chars + len(doc_text) > MAX_TOTAL_CONTEXT_CHARS:
-                    # Skip remaining documents to avoid exceeding limit
-                    break
-                
-                total_chars += len(doc_text)
                 
                 # Include title on first line if available
                 if title:

@@ -5,6 +5,8 @@ FEW_SHOT_MEDQA = """You are a medical expert. For each question, select the best
 Answer: <LETTER>. <option text>
 Explanation: [Brief reasoning]
 
+If a context passage is provided, use it to support your reasoning. If the context conflicts with well-established medical knowledge, favor the medically correct answer.
+
 # Examples:
 ## Question:
 A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
@@ -47,6 +49,7 @@ Explanation: The key diagnostic features are the central location, smoking histo
 """
 
 FEW_SHOT_COT = """You are a medical expert. Think step-by-step before selecting the best answer.
+If a context passage is provided, use it to support your reasoning. If the context conflicts with well-established medical knowledge, favor the medically correct answer.
 
 # Format:
 Answer: <LETTER>. <option text>
@@ -126,13 +129,13 @@ def format_question_with_options(item: dict) -> str:
 def format_question(question: str, use_few_shot: bool = True) -> str:
     """Format question with optional few-shot examples for MCQ answering.
 
-    Expectation: model should output in the form:
-    <LETTER>. <option text>
+    Expectation: model shou ld output in the form:
     Explanation: [Brief reasoning]
+    <LETTER>. <option text>
     e.g., 'B. Tell the attending that he cannot fail to disclose this mistake'
     """
     if use_few_shot:
-        return f"{FEW_SHOT_MEDQA}\n\n## Question:\n{question}\n\n## Response:\n"
+        return f"{FEW_SHOT_MEDQA}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n## Question:\n{question}\n\n## Response:\n"
     else:
         instruction = (
             "Select the best answer from the options below.\n"
@@ -145,12 +148,12 @@ def format_cot_question(question: str, use_few_shot: bool = True) -> str:
     """Format question with Chain-of-Thought few-shot examples.
 
     Expectation: model should output step-by-step reasoning then answer:
-    Answer: <LETTER>. <option text>
     Step 1: ...
     Step 2: ...
+    Answer: <LETTER>. <option text>
     """
     if use_few_shot:
-        return f"{FEW_SHOT_COT}\n\n## Question:\n{question}\n\n## Response:\n"
+        return f"{FEW_SHOT_COT}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n## Question:\n{question}\n\n## Response:\n"
     else:
         instruction = (
             "You are a medical expert. Think step-by-step before selecting the best answer.\n"
@@ -158,7 +161,7 @@ def format_cot_question(question: str, use_few_shot: bool = True) -> str:
             "Answer: <LETTER>. <option text>\n"
             "Step 1: [First reasoning step]\n"
             "Step 2: [Second reasoning step]\n"
-            "...\n\n"
+            "...\n"
         )
         return f"{instruction}## Question:\n{question}\n\n## Response:\n"
 
@@ -167,11 +170,12 @@ def format_rag_prompt(question: str, context: str, use_few_shot: bool = True) ->
     """Format RAG prompt with retrieved context.
 
     Expectation: model should output in the form:
-    <LETTER>. <option text>
+    Answer: <LETTER>. <option text>
+    Explanation: [Brief reasoning]
     """
     if use_few_shot:
         return (
-            f"{FEW_SHOT_MEDQA}\n\n"
+            f"{FEW_SHOT_MEDQA}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n"
             f"## Context:\n{context}\n\n"
             f"## Question:\n{question}\n\n"
             f"## Response:\n"
@@ -211,7 +215,7 @@ def format_cot_prompt_with_options(item: dict, use_few_shot: bool = True) -> str
 
     if use_few_shot:
         return (
-            f"{FEW_SHOT_COT}\n\n"
+            f"{FEW_SHOT_COT}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n"
             f"## Question:\n{question}\n\n"
             f"## Options:\n{options_text}\n\n"
             f"## Response:\n"
@@ -220,10 +224,10 @@ def format_cot_prompt_with_options(item: dict, use_few_shot: bool = True) -> str
         instruction = (
             "You are a medical expert. Think step-by-step before selecting the best answer.\n"
             "# Format:\n"
-            "Answer: <LETTER>. <option text>\n"
             "Step 1: [First reasoning step]\n"
             "Step 2: [Second reasoning step]\n"
             "...\n"
+            "Answer: <LETTER>. <option text>\n\n"
         )
         return (
             f"{instruction}"
@@ -440,6 +444,57 @@ def clean_answer(text: str) -> str:
     for token in tokens:
         text = text.replace(token, " ")
     return " ".join(text.split()).strip()
+
+
+def extract_answer_part(text: str) -> str:
+    """
+    Extract only the "Answer: ..." part from model output for saving to JSON.
+    
+    If "Answer: " is found, extracts everything from "Answer: " onwards up to:
+    - The end of that line, OR
+    - Stop before "Explanation:", "Step", or next major section
+    
+    If "Answer: " is not found, returns empty string.
+    
+    Args:
+        text: Raw model output
+        
+    Returns:
+        Extracted "Answer: ..." part, or empty string if not found
+    """
+    if not text:
+        return ""
+    
+    # Clean special tokens first
+    text_cleaned = clean_answer(text)
+    if not text_cleaned:
+        return ""
+    
+    # Find "Answer: " (case-insensitive)
+    lower_text = text_cleaned.lower()
+    marker = "answer:"
+    start_idx = lower_text.find(marker)
+    
+    if start_idx == -1:
+        # "Answer: " not found
+        return ""
+    
+    # Extract from "Answer: " onwards
+    answer_part = text_cleaned[start_idx:].strip()
+    
+    # Stop at newline or before common next sections
+    lines = answer_part.split('\n')
+    first_line = lines[0].strip()
+    
+    # If there's "Explanation:" or "Step" on the same line, stop before it
+    lower_first = first_line.lower()
+    for stop_word in ["explanation:", "step 1:", "step 2:", "reasoning:"]:
+        stop_idx = lower_first.find(stop_word)
+        if stop_idx != -1:
+            first_line = first_line[:stop_idx].strip()
+            break
+    
+    return first_line
 
 
 if __name__ == "__main__":

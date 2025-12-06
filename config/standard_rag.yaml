@@ -3,18 +3,18 @@
 # Retriever + Generator
 retriever:
   type: FAISSRetriever
-  top_k: 3
-  faiss_index_paths: "data/index/med_faiss.index"
-  articles_paths: "data/corpus/med_pure_corpus.jsonl"
-  metadata_paths: "data/index/med_faiss_meta.jsonl"
+  top_k: 5
+  faiss_index_paths: "data/index/med_faiss_chunked.index"
+  articles_paths: "data/corpus/med_chunked_corpus.jsonl"
+  metadata_paths: "data/index/med_faiss_chunked_meta.jsonl"
 
 generator:
   type: VLLMGenerator
   model_path: "meta-llama/Llama-2-7b-hf"
-  max_tokens: 200
+  max_tokens: 400
   temperature: 0.0
-  enforce_eager: false  # Enable CUDA graphs for faster generation
-  gpu_memory_utilization: 0.85  # Use more GPU memory for KV cache
+  enforce_eager: false  # Disable CUDA graphs to prevent initialization hangs
+  gpu_memory_utilization: 0.85  # For 24GB GPU: 85% = 20.4GB used, 3.6GB buffer (optimal)
 
 # No augmentations (vanilla RAG)
 augmentations:
@@ -29,3 +29,7 @@ dataset: "eval_datasets/medqa_test.jsonl"
 max_samples: null  # Start small for testing - change to 100 or more later
 verbose: true  # Print detailed logs (prompts, documents, predictions)
 output_path: "predictions/standard_rag"
+
+# Batching configuration
+batch_size: 256  # Number of queries to process in each batch during generation
+use_batched_generation: true  # Enable batched generation (sequential retrieval, batch generation)

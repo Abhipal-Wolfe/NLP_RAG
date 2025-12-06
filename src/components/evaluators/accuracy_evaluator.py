@@ -68,7 +68,11 @@ class AccuracyEvaluator(Evaluator):
             choice_total += 1
             is_correct = False
 
-            if pred_letter == gt_letter:
+            # STRICT: If prediction format is wrong (no "Answer: " or no letter), mark as incorrect
+            if not pred_letter:
+                # Format is wrong - mark as incorrect
+                is_correct = False
+            elif pred_letter == gt_letter:
                 is_correct = True
             else:
                 is_correct = False
@@ -99,13 +103,12 @@ class AccuracyEvaluator(Evaluator):
     def _parse_prediction(self, text: str) -> Tuple[str, str]:
         """
         Parse model prediction into (choice_letter, option_text).
-
-        - Prefer to look after 'Answer:' (case-insensitive).
-        - First try patterns like '<LETTER>. <text>'.
-        - If that fails, fall back to finding a standalone LETTER only.
+        
+        STRICT FORMAT REQUIREMENT: Must have "Answer: " prefix.
+        If "Answer: " is not found, returns empty string (marked as wrong).
 
         Returns:
-            (letter, text) where letter is 'A'...'D' or '' if not found,
+            (letter, text) where letter is 'A'...'D' or '' if format is wrong,
             and text is the option text (possibly empty).
         """
         if not text:
@@ -115,28 +118,38 @@ class AccuracyEvaluator(Evaluator):
         if not t:
             return "", ""
 
-        # Locate 'Answer:' marker (case-insensitive)
+        # STRICT: Locate 'Answer:' marker (case-insensitive)
         lower_t = t.lower()
         marker = "answer:"
         start_idx = lower_t.find(marker)
-        if start_idx != -1:
-            region = t[start_idx + len(marker):].strip()
-        else:
-            region = t
+        
+        # If "Answer: " not found, format is wrong - return empty
+        if start_idx == -1:
+            return "", ""
 
-        # 1) Try pattern: 'A. some text' or '(A) some text'
+        # Extract region after "Answer: "
+        region = t[start_idx + len(marker):].strip()
+        
+        if not region:
+            return "", ""
+
+        # Try pattern: 'A. some text' or 'A) some text'
         m = re.search(r"[ \t]*\(?([A-D])\)?[.)]\s*(.+)", region)
         if m:
             letter = m.group(1)
             opt_text = m.group(2).strip()
+            # Extract only up to newline or next major section
+            if '\n' in opt_text:
+                opt_text = opt_text.split('\n')[0].strip()
             return letter, opt_text
 
-        # 2) Try standalone letter (no text reliably parsed)
-        m2 = re.search(r"\b([A-D])\b", region)
+        # Try standalone letter immediately after "Answer: "
+        m2 = re.search(r"^([A-D])\b", region)
         if m2:
             letter = m2.group(1)
             return letter, ""
 
+        # Format is wrong - "Answer: " found but no valid letter pattern
         return "", ""
 
     def _parse_ground_truth(self, gt: Any) -> Tuple[str, str]:

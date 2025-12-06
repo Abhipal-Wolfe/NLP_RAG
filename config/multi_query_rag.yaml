@@ -12,10 +12,10 @@ generator:
 
 retriever:
   type: FAISSRetriever
-  top_k: 1  # Top 1 per sub-query, so 3 sub-queries = 3 documents total
-  faiss_index_paths: "data/index/med_faiss.index"
-  articles_paths: "data/corpus/med_pure_corpus.jsonl"
-  metadata_paths: "data/index/med_faiss_meta.jsonl"
+  top_k: 2  # Top 2 per sub-query, so 3 sub-queries = 6 documents total
+  faiss_index_paths: "data/index/med_faiss_chunked.index"
+  articles_paths: "data/corpus/med_chunked_corpus.jsonl"
+  metadata_paths: "data/index/med_faiss_chunked_meta.jsonl"
 
 # DMQR-RAG: 3-Strategy Query Rewriting
 # GQR (General) + KWR (Keyword) + PAR (Pseudo-Answer)

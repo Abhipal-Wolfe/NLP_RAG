@@ -54,21 +54,10 @@ def critic_reranker_augmentation(
     ut_tokens = tokens.get("ut_tokens", {})
 
     # Generate prompts for each document
-    # Truncate document content to fit within model's context limit (4096 tokens)
-    # Reserve space for: query (~500 tokens) + response format (~50 tokens) + generation (~100 tokens)
-    # Approximate: 4 chars ≈ 1 token
-    MAX_DOC_CHARS = 10000  # ~2500 tokens, leaving ~1500 tokens for query/response/generation
-    
     prompts = []
     for doc_idx, doc in enumerate(documents):
         title = doc.metadata.get("title", "")
         content = doc.page_content
-        
-        # Truncate content if too long
-        if len(content) > MAX_DOC_CHARS:
-            content = content[:MAX_DOC_CHARS] + "... [truncated]"
-            if verbose and idx == 0:
-                print(f"Document {doc_idx + 1} truncated from {len(doc.page_content)} to {MAX_DOC_CHARS} chars")
         
         # Use standard format from prompts.py
         prompt = format_critic_prompt(query, content, title)
