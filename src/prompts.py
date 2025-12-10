@@ -1,55 +1,95 @@
 """Prompt templates for RAG pipeline"""
 
-FEW_SHOT_MEDQA = """You are a medical expert. For each question, select the best answer.
+# FEW_SHOT_MEDQA = """You are a medical expert. For each question, select the best answer.
+# # Format: 
+# Answer: <LETTER>. <option text>
+# Explanation: [Brief reasoning]
+
+# # Examples:
+# ## Question:
+# A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
+
+# ## Options:
+# A. Hyperthyroidism
+# B. Primary hypothyroidism
+# C. Secondary hypothyroidism
+# D. Euthyroid sick syndrome
+
+# ## Response:
+# Answer: B. Primary hypothyroidism
+# Explanation: The patient presents with classic symptoms of hypothyroidism (fatigue, weight gain, cold intolerance). The combination of elevated TSH and low free T4 confirms primary hypothyroidism, where the thyroid gland itself fails to produce adequate hormone, triggering compensatory TSH elevation from the pituitary.
+
+# ## Question:
+# A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+
+# ## Options:
+# A. DiGeorge syndrome
+# B. Bruton agammaglobulinemia
+# C. Selective IgA deficiency
+# D. Chronic granulomatous disease
+
+# ## Response:
+# Answer: B. Bruton agammaglobulinemia
+# Explanation: The complete absence of B cells with low levels of all immunoglobulin classes (IgG, IgA, IgM) is pathognomonic for Bruton agammaglobulinemia, an X-linked agammaglobulinemia caused by defective B cell maturation. This leads to recurrent bacterial infections in early childhood.
+
+# ## Question:
+# A 60-year-old smoker has a chronic cough and weight loss. Chest X-ray shows a central mass. Biopsy shows small blue cells. What is the most likely diagnosis?
+
+# ## Options:
+# A. Adenocarcinoma
+# B. Squamous cell carcinoma
+# C. Small cell lung cancer
+# D. Large cell carcinoma
+
+# ## Response:
+# Answer: C. Small cell lung cancer
+# Explanation: The key diagnostic features are the central location, smoking history, and histology showing "small blue cells" (small round cells with scant cytoplasm and hyperchromatic nuclei). Small cell lung cancer is strongly associated with smoking, typically presents centrally, and has characteristic neuroendocrine histology.
+# """
+
+FEW_SHOT_MEDQA = """You are a biomedical research expert. For each research question, answer based on the provided PubMed abstract context.
 # Format: 
 Answer: <LETTER>. <option text>
-Explanation: [Brief reasoning]
-
-If a context passage is provided, use it to support your reasoning. If the context conflicts with well-established medical knowledge, favor the medically correct answer.
+Explanation: [Brief reasoning based on the abstract]
 
 # Examples:
 ## Question:
-A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
+Does metformin reduce cardiovascular events in type 2 diabetes patients?
 
 ## Options:
-A. Hyperthyroidism
-B. Primary hypothyroidism
-C. Secondary hypothyroidism
-D. Euthyroid sick syndrome
+A. yes
+B. no
+C. maybe
 
 ## Response:
-Answer: B. Primary hypothyroidism
-Explanation: The patient presents with classic symptoms of hypothyroidism (fatigue, weight gain, cold intolerance). The combination of elevated TSH and low free T4 confirms primary hypothyroidism, where the thyroid gland itself fails to produce adequate hormone, triggering compensatory TSH elevation from the pituitary.
+Answer: A. yes
+Explanation: The meta-analysis demonstrates a statistically significant 18% reduction in major adverse cardiovascular events with metformin compared to placebo (HR 0.82, 95% CI 0.71-0.95, p=0.008), with consistent benefits across patient subgroups.
 
 ## Question:
-A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+Do statins increase the risk of dementia?
 
 ## Options:
-A. DiGeorge syndrome
-B. Bruton agammaglobulinemia
-C. Selective IgA deficiency
-D. Chronic granulomatous disease
+A. yes
+B. no
+C. maybe
 
 ## Response:
-Answer: B. Bruton agammaglobulinemia
-Explanation: The complete absence of B cells with low levels of all immunoglobulin classes (IgG, IgA, IgM) is pathognomonic for Bruton agammaglobulinemia, an X-linked agammaglobulinemia caused by defective B cell maturation. This leads to recurrent bacterial infections in early childhood.
+Answer: B. no
+Explanation: The study found no significant association between statin use and dementia risk (HR 0.98, 95% CI 0.89-1.08, p=0.67), with consistent null findings across different statin types, doses, and durations of use.
 
 ## Question:
-A 60-year-old smoker has a chronic cough and weight loss. Chest X-ray shows a central mass. Biopsy shows small blue cells. What is the most likely diagnosis?
+Is higher-dose vitamin D supplementation more effective for bone health in postmenopausal women?
 
 ## Options:
-A. Adenocarcinoma
-B. Squamous cell carcinoma
-C. Small cell lung cancer
-D. Large cell carcinoma
+A. yes
+B. no
+C. maybe
 
 ## Response:
-Answer: C. Small cell lung cancer
-Explanation: The key diagnostic features are the central location, smoking history, and histology showing "small blue cells" (small round cells with scant cytoplasm and hyperchromatic nuclei). Small cell lung cancer is strongly associated with smoking, typically presents centrally, and has characteristic neuroendocrine histology.
+Answer: C. maybe
+Explanation: While the higher dose showed a slightly greater BMD improvement (+1.4% vs +1.2%), the difference was not statistically significant (p=0.42). The higher dose also increased hypercalcemia risk, making the benefit-risk balance uncertain.
 """
 
-FEW_SHOT_COT = """You are a medical expert. Think step-by-step before selecting the best answer.
-If a context passage is provided, use it to support your reasoning. If the context conflicts with well-established medical knowledge, favor the medically correct answer.
+FEW_SHOT_COT = """You are a biomedical research expert. Think step-by-step before selecting the best answer based on the provided PubMed abstract context.
 
 # Format:
 Answer: <LETTER>. <option text>
@@ -58,60 +98,81 @@ Step 2: [Second reasoning step]
 Step N: [Nth reasoning step]
 
 # Examples:
-## Question:
-A 35-year-old woman presents with fatigue, weight gain, and cold intolerance. TSH is elevated and free T4 is low. What is the most likely diagnosis?
+## Context:
+Background: Type 2 diabetes mellitus (T2DM) is associated with increased cardiovascular risk. Metformin is the first-line treatment, but its cardiovascular benefits remain debated.
 
-## Options:
-A. Hyperthyroidism
-B. Primary hypothyroidism
-C. Secondary hypothyroidism
-D. Euthyroid sick syndrome
+Methods: We conducted a systematic review and meta-analysis of randomized controlled trials comparing metformin to placebo or other antidiabetic agents in T2DM patients. Primary outcomes were major adverse cardiovascular events (MACE). We searched PubMed, EMBASE, and Cochrane databases from inception to 2023.
 
-## Response:
-Answer: B. Primary hypothyroidism
-Step 1: The patient has fatigue, weight gain, and cold intolerance - these are classic symptoms of hypothyroidism (underactive thyroid).
-Step 2: Lab findings show elevated TSH and low free T4. In primary hypothyroidism, the thyroid fails, causing low T4, which triggers the pituitary to produce more TSH.
-Step 3: In secondary hypothyroidism, both TSH and T4 would be low (pituitary problem). Here TSH is elevated, ruling this out.
-Step 4: Euthyroid sick syndrome typically shows low T3 with normal or low TSH in acutely ill patients - doesn't fit this presentation.
+Results: Meta-analysis of 12 trials (n=8,432) showed metformin reduced MACE by 18% (HR 0.82, 95% CI 0.71-0.95, p=0.008) compared to placebo. The benefit was consistent across subgroups defined by age, baseline HbA1c, and diabetes duration. No significant heterogeneity was observed (I²=23%, p=0.21).
 
 ## Question:
-A 2-year-old boy has recurrent bacterial infections. Labs show low IgG, IgA, and IgM. B cells are absent. What is the diagnosis?
+Does metformin reduce cardiovascular events in type 2 diabetes patients?
 
 ## Options:
-A. DiGeorge syndrome
-B. Bruton agammaglobulinemia
-C. Selective IgA deficiency
-D. Chronic granulomatous disease
+A. yes
+B. no
+C. maybe
 
 ## Response:
-Answer: B. Bruton agammaglobulinemia
-Step 1: Key findings are recurrent bacterial infections, absent B cells, and pan-hypogammaglobulinemia (low IgG, IgA, IgM).
-Step 2: DiGeorge syndrome affects T cells (thymic aplasia), not B cells - ruled out.
-Step 3: Selective IgA deficiency only affects IgA, not all immunoglobulins - ruled out.
-Step 4: Chronic granulomatous disease affects neutrophil function, not antibody production - ruled out.
-Step 5: Bruton agammaglobulinemia (X-linked) causes arrested B cell development, leading to absent B cells and no immunoglobulin production. This matches perfectly.
+Answer: A. yes
+Step 1: The meta-analysis included 12 randomized controlled trials with 8,432 participants, providing robust evidence.
+Step 2: The primary outcome shows a statistically significant 18% reduction in major adverse cardiovascular events (HR 0.82, 95% CI 0.71-0.95, p=0.008).
+Step 3: The confidence interval (0.71-0.95) does not cross 1.0, indicating a true protective effect, not chance.
+Step 4: The benefit was consistent across different patient subgroups, and there was no significant heterogeneity, suggesting reliable findings.
+Step 5: The p-value of 0.008 is well below the conventional threshold of 0.05, confirming statistical significance.
+
+## Context:
+Background: Statin therapy reduces LDL cholesterol, but its effect on cognitive function is controversial, with some studies suggesting increased dementia risk.
+
+Methods: We analyzed data from 3 prospective cohort studies (n=15,234) examining statin use and incident dementia over 10 years. Cognitive assessments were performed biennially using standardized tests. Propensity score matching was used to control for confounding variables.
+
+Results: Statin users had similar dementia incidence to non-users (HR 0.98, 95% CI 0.89-1.08, p=0.67). Subgroup analyses by statin type (atorvastatin, simvastatin, rosuvastatin), dose, and duration showed no significant associations. Sensitivity analyses excluding early dementia cases yielded similar results.
 
 ## Question:
-A 60-year-old smoker has a chronic cough and weight loss. Chest X-ray shows a central mass. Biopsy shows small blue cells. What is the most likely diagnosis?
+Do statins increase the risk of dementia?
 
 ## Options:
-A. Adenocarcinoma
-B. Squamous cell carcinoma
-C. Small cell lung cancer
-D. Large cell carcinoma
+A. yes
+B. no
+C. maybe
 
 ## Response:
-Answer: C. Small cell lung cancer
-Step 1: Patient is a 60-year-old smoker with cough and weight loss - high risk for lung cancer.
-Step 2: The mass is centrally located. Central lung cancers are typically small cell or squamous cell carcinoma.
-Step 3: Biopsy shows "small blue cells" - this is the classic histologic description of small cell lung cancer (neuroendocrine tumor with scant cytoplasm).
-Step 4: Adenocarcinoma is typically peripheral and shows glandular pattern - doesn't match.
-Step 5: Squamous cell has keratinization and intercellular bridges - "small blue cells" is not its characteristic appearance.
+Answer: B. no
+Step 1: The study analyzed a large cohort (15,234 participants) over 10 years with biennial cognitive assessments, providing substantial follow-up.
+Step 2: The hazard ratio is 0.98 (95% CI 0.89-1.08), which is close to 1.0 and the confidence interval includes 1.0, indicating no significant association.
+Step 3: The p-value of 0.67 is far above 0.05, confirming no statistically significant difference between statin users and non-users.
+Step 4: Subgroup analyses by statin type, dose, and duration all showed no significant associations, strengthening the null finding.
+Step 5: The study used propensity score matching to control for confounders, and sensitivity analyses confirmed the results, indicating robust methodology.
+
+## Context:
+Background: Vitamin D supplementation may improve bone health in older adults, but optimal dosing remains uncertain, with conflicting evidence on high-dose regimens.
+
+Methods: Randomized, double-blind trial of 200 postmenopausal women (age 65-80) receiving either 800 IU/day or 2000 IU/day vitamin D3 for 12 months. Primary endpoint was change in bone mineral density (BMD) at the lumbar spine. Secondary endpoints included BMD at hip, serum 25(OH)D levels, and adverse events.
+
+Results: Both groups showed similar BMD improvements (800 IU: +1.2%, 2000 IU: +1.4%, p=0.42 for between-group difference). However, the 2000 IU group had higher rates of hypercalcemia (8% vs 2%, p=0.03) and kidney stones (3% vs 0%, p=0.08). Mean serum 25(OH)D levels were 32 ng/mL (800 IU) vs 45 ng/mL (2000 IU).
+
+## Question:
+Is higher-dose vitamin D supplementation more effective for bone health in postmenopausal women?
+
+## Options:
+A. yes
+B. no
+C. maybe
+
+## Response:
+Answer: C. maybe
+Step 1: The higher dose (2000 IU) showed a slightly greater BMD improvement (+1.4% vs +1.2%), but the difference was not statistically significant (p=0.42).
+Step 2: The p-value of 0.42 is well above 0.05, meaning we cannot confidently conclude the higher dose is more effective.
+Step 3: The higher dose achieved higher serum 25(OH)D levels (45 vs 32 ng/mL), suggesting better absorption, but this did not translate to significantly better bone outcomes.
+Step 4: The higher dose was associated with increased adverse events (hypercalcemia 8% vs 2%, p=0.03), raising safety concerns.
+Step 5: The benefit-risk balance is uncertain: potentially slightly better efficacy but with increased side effects, making a definitive answer difficult without longer-term studies.
 """
 
 
 def format_question_with_options(item: dict) -> str:
     """Extract question and format with options from dataset item.
+    
+    Supports both MedQA (A/B/C/D) and PubMedQA (yes/no/maybe) formats.
     
     Args:
         item: Dataset item with 'question' and optionally 'options' fields
@@ -126,80 +187,164 @@ def format_question_with_options(item: dict) -> str:
     return question
 
 
-def format_question(question: str, use_few_shot: bool = True) -> str:
+def is_pubmedqa_format(item: dict) -> bool:
+    """Detect if dataset item is in PubMedQA format (yes/no/maybe).
+    
+    Args:
+        item: Dataset item
+        
+    Returns:
+        True if PubMedQA format, False otherwise
+    """
+    if "options" not in item:
+        return False
+    
+    options = item["options"]
+    if not isinstance(options, dict):
+        return False
+    
+    # Check if options are yes/no/maybe (PubMedQA format)
+    option_values = [str(v).lower() for v in options.values()]
+    pubmedqa_values = {"yes", "no", "maybe"}
+    
+    return set(option_values) == pubmedqa_values or set(option_values) == {"a. yes", "b. no", "c. maybe"}
+
+
+def format_question(question: str, use_few_shot: bool = True, dataset_type: str = "pubmedqa") -> str:
     """Format question with optional few-shot examples for MCQ answering.
 
-    Expectation: model shou ld output in the form:
+    Expectation: model should output in the form:
     Explanation: [Brief reasoning]
     <LETTER>. <option text>
     e.g., 'B. Tell the attending that he cannot fail to disclose this mistake'
+    
+    Args:
+        question: Formatted question string (may include options)
+        use_few_shot: Whether to include few-shot examples
+        dataset_type: "medqa" or "pubmedqa"
     """
-    if use_few_shot:
-        return f"{FEW_SHOT_MEDQA}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n## Question:\n{question}\n\n## Response:\n"
+    if dataset_type == "pubmedqa":
+        if use_few_shot:
+            return f"{FEW_SHOT_MEDQA}\n\n# Given three answer candidates (yes, no, maybe), choose the best answer based on the provided context.\n\n## Question:\n{question}\n\n## Response:\n"
+        else:
+            instruction = (
+                "Based on the provided context, answer the research question.\n"
+                "## Format:\nAnswer: <LETTER>. <option text>\nExplanation: [Brief reasoning based on context]\n\n"
+            )
+            return f"{instruction}## Question:\n{question}\n\n## Response:\n"
     else:
-        instruction = (
-            "Select the best answer from the options below.\n"
-            "## Format:\nAnswer: <LETTER>. <option text>\nExplanation: [Brief reasoning]\n\n"
-        )
-        return f"{instruction}## Question:\n{question}\n\n## Response:\n"
+        if use_few_shot:
+            return f"{FEW_SHOT_MEDQA}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n## Question:\n{question}\n\n## Response:\n"
+        else:
+            instruction = (
+                "Select the best answer from the options below.\n"
+                "## Format:\nAnswer: <LETTER>. <option text>\nExplanation: [Brief reasoning]\n\n"
+            )
+            return f"{instruction}## Question:\n{question}\n\n## Response:\n"
 
 
-def format_cot_question(question: str, use_few_shot: bool = True) -> str:
+def format_cot_question(question: str, use_few_shot: bool = True, dataset_type: str = "pubmedqa") -> str:
     """Format question with Chain-of-Thought few-shot examples.
 
     Expectation: model should output step-by-step reasoning then answer:
     Step 1: ...
     Step 2: ...
     Answer: <LETTER>. <option text>
+    
+    Args:
+        question: Formatted question string (may include options)
+        use_few_shot: Whether to include few-shot examples
+        dataset_type: "medqa" or "pubmedqa"
     """
-    if use_few_shot:
-        return f"{FEW_SHOT_COT}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n## Question:\n{question}\n\n## Response:\n"
+    if dataset_type == "pubmedqa":
+        if use_few_shot:
+            return f"{FEW_SHOT_COT}\n\n# Given three answer candidates (yes, no, maybe), choose the best answer based on the provided context.\n\n## Question:\n{question}\n\n## Response:\n"
+        else:
+            instruction = (
+                "You are a biomedical research expert. Think step-by-step before selecting the best answer based on the provided context.\n"
+                "# Format:\n"
+                "Answer: <LETTER>. <option text>\n"
+                "Step 1: [First reasoning step]\n"
+                "Step 2: [Second reasoning step]\n"
+                "...\n"
+            )
+            return f"{instruction}## Question:\n{question}\n\n## Response:\n"
     else:
-        instruction = (
-            "You are a medical expert. Think step-by-step before selecting the best answer.\n"
-            "# Format:\n"
-            "Answer: <LETTER>. <option text>\n"
-            "Step 1: [First reasoning step]\n"
-            "Step 2: [Second reasoning step]\n"
-            "...\n"
-        )
-        return f"{instruction}## Question:\n{question}\n\n## Response:\n"
+        if use_few_shot:
+            return f"{FEW_SHOT_COT}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n## Question:\n{question}\n\n## Response:\n"
+        else:
+            instruction = (
+                "You are a medical expert. Think step-by-step before selecting the best answer.\n"
+                "# Format:\n"
+                "Answer: <LETTER>. <option text>\n"
+                "Step 1: [First reasoning step]\n"
+                "Step 2: [Second reasoning step]\n"
+                "...\n"
+            )
+            return f"{instruction}## Question:\n{question}\n\n## Response:\n"
 
 
-def format_rag_prompt(question: str, context: str, use_few_shot: bool = True) -> str:
+def format_rag_prompt(question: str, context: str, use_few_shot: bool = True, dataset_type: str = "pubmedqa") -> str:
     """Format RAG prompt with retrieved context.
 
     Expectation: model should output in the form:
     Answer: <LETTER>. <option text>
     Explanation: [Brief reasoning]
+    
+    Args:
+        question: Formatted question string (may include options)
+        context: Retrieved context/documentation
+        use_few_shot: Whether to include few-shot examples
+        dataset_type: "medqa" or "pubmedqa"
     """
-    if use_few_shot:
-        return (
-            f"{FEW_SHOT_MEDQA}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n"
-            f"## Context:\n{context}\n\n"
-            f"## Question:\n{question}\n\n"
-            f"## Response:\n"
-        )
+    if dataset_type == "pubmedqa":
+        if use_few_shot:
+            return (
+                f"{FEW_SHOT_MEDQA}\n\n"
+                f"## Context:\n{context}\n\n"
+                f"## Question:\n{question}\n\n"
+                f"## Response:\n"
+            )
+        else:
+            instruction = (
+                "Based on the provided context, answer the research question.\n"
+                "## Format:\nAnswer: <LETTER>. <option text>\nExplanation: [Brief reasoning based on context]\n\n"
+            )
+            return (
+                f"{instruction}"
+                f"## Context:\n{context}\n\n"
+                f"## Question:\n{question}\n\n"
+                f"## Response:\n"
+            )
     else:
-        instruction = (
-            "Use the provided context to answer the question.\n"
-            "## Format:\nAnswer: <LETTER>. <option text>\nExplanation: [Brief reasoning]\n\n"
-        )
-        return (
-            f"{instruction}"
-            f"## Context:\n{context}\n\n"
-            f"## Question:\n{question}\n\n"
-            f"## Response:\n"
-        )
+        if use_few_shot:
+            return (
+                f"{FEW_SHOT_MEDQA}\n\n"
+                f"## Context:\n{context}\n\n"
+                f"## Question:\n{question}\n\n"
+                f"## Response:\n"
+            )
+        else:
+            instruction = (
+                "Use the provided context to answer the question.\n"
+                "## Format:\nAnswer: <LETTER>. <option text>\nExplanation: [Brief reasoning]\n\n"
+            )
+            return (
+                f"{instruction}"
+                f"## Context:\n{context}\n\n"
+                f"## Question:\n{question}\n\n"
+                f"## Response:\n"
+            )
 
 
-def format_cot_prompt_with_options(item: dict, use_few_shot: bool = True) -> str:
+def format_cot_prompt_with_options(item: dict, use_few_shot: bool = True, dataset_type: str = "pubmedqa") -> str:
     """
     Format a CoT (Chain of Thought) prompt with step-by-step reasoning.
 
     Args:
         item: Dataset item with 'question' and optionally 'options' fields
         use_few_shot: Whether to include few-shot examples
+        dataset_type: "medqa" or "pubmedqa"
 
     Returns:
         Formatted prompt string
@@ -213,28 +358,52 @@ def format_cot_prompt_with_options(item: dict, use_few_shot: bool = True) -> str
     elif isinstance(options, (list, tuple)) and options:
         options_text = "\n".join([f"{chr(ord('A') + idx)}. {opt}" for idx, opt in enumerate(options)])
 
-    if use_few_shot:
-        return (
-            f"{FEW_SHOT_COT}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n"
-            f"## Question:\n{question}\n\n"
-            f"## Options:\n{options_text}\n\n"
-            f"## Response:\n"
-        )
+    if dataset_type == "pubmedqa":
+        if use_few_shot:
+            return (
+                f"{FEW_SHOT_COT}\n\n# Given three answer candidates (yes, no, maybe), choose the best answer based on the provided context.\n\n"
+                f"## Question:\n{question}\n\n"
+                f"## Options:\n{options_text}\n\n"
+                f"## Response:\n"
+            )
+        else:
+            instruction = (
+                "You are a biomedical research expert. Think step-by-step before selecting the best answer based on the provided context.\n"
+                "# Format:\n"
+                "Step 1: [First reasoning step]\n"
+                "Step 2: [Second reasoning step]\n"
+                "...\n"
+                "Answer: <LETTER>. <option text>\n\n"
+            )
+            return (
+                f"{instruction}"
+                f"## Question:\n{question}\n\n"
+                f"## Options:\n{options_text}\n\n"
+                f"## Response:\n"
+            )
     else:
-        instruction = (
-            "You are a medical expert. Think step-by-step before selecting the best answer.\n"
-            "# Format:\n"
-            "Step 1: [First reasoning step]\n"
-            "Step 2: [Second reasoning step]\n"
-            "...\n"
-            "Answer: <LETTER>. <option text>\n\n"
-        )
-        return (
-            f"{instruction}"
-            f"## Question:\n{question}\n\n"
-            f"## Options:\n{options_text}\n\n"
-            f"## Response:\n"
-        )
+        if use_few_shot:
+            return (
+                f"{FEW_SHOT_COT}\n\n# Given four answer candidates, A, B, C and D, choose the best answer choice.\n\n"
+                f"## Question:\n{question}\n\n"
+                f"## Options:\n{options_text}\n\n"
+                f"## Response:\n"
+            )
+        else:
+            instruction = (
+                "You are a medical expert. Think step-by-step before selecting the best answer.\n"
+                "# Format:\n"
+                "Step 1: [First reasoning step]\n"
+                "Step 2: [Second reasoning step]\n"
+                "...\n"
+                "Answer: <LETTER>. <option text>\n\n"
+            )
+            return (
+                f"{instruction}"
+                f"## Question:\n{question}\n\n"
+                f"## Options:\n{options_text}\n\n"
+                f"## Response:\n"
+            )
 
 
 def format_retrieval_decision(question: str) -> str:
@@ -254,12 +423,52 @@ def format_retrieval_decision(question: str) -> str:
 # Strategies: GQR (General), KWR (Keyword), PAR (Pseudo-Answer)
 # ============================================================================
 
-def format_query_rewrite_gqr(question: str) -> str:
+def format_query_rewrite_gqr(question: str, dataset_type: str = "pubmedqa") -> str:
     """
     GQR - General Query Rewrite (Few-shot)
     Clean, well-formed search query version.
+    
+    Args:
+        question: Research question to rewrite
+        dataset_type: "medqa" or "pubmedqa"
     """
-    return f"""
+    if dataset_type == "pubmedqa":
+        return f"""
+# Instruction:
+You rewrite biomedical research questions into **clean, information-preserving search queries**
+optimized for PubMed and biomedical retrieval systems. Maintain all important entities,
+interventions, outcomes, populations, study designs, and key findings. Remove filler words,
+question phrasing, and yes/no/maybe answer options.
+
+# Format:
+Search query: <rewritten_query>
+
+# Examples:
+## Question: 
+Does metformin reduce cardiovascular events in type 2 diabetes patients?
+
+## Response:
+Search query: metformin cardiovascular events type 2 diabetes major adverse cardiovascular events MACE
+
+## Question: 
+Do statins increase the risk of dementia in older adults?
+
+## Response:
+Search query: statins dementia risk older adults cognitive function incidence
+
+## Question:
+Is higher-dose vitamin D supplementation more effective for bone health in postmenopausal women?
+
+## Response:
+Search query: high dose vitamin D supplementation bone health postmenopausal women bone mineral density BMD
+
+## Question: 
+{question}
+
+## Response:
+Search query: """
+    else:
+        return f"""
 # Instruction:
 You rewrite clinical questions into **clean, information-preserving search queries**
 optimized for biomedical retrieval systems. Maintain all important entities,
@@ -297,12 +506,53 @@ Search query: smoker chronic cough digital clubbing cavitary upper lobe lesion p
 Search query: """
 
 
-def format_query_rewrite_kwr(question: str) -> str:
+def format_query_rewrite_kwr(question: str, dataset_type: str = "pubmedqa") -> str:
     """
     KWR - Keyword Rewrite (Few-shot)
-    Extract key medical terms as keywords.
+    Extract key biomedical terms as keywords.
+    
+    Args:
+        question: Research question to rewrite
+        dataset_type: "medqa" or "pubmedqa"
     """
-    return f"""
+    if dataset_type == "pubmedqa":
+        return f"""
+# Instruction:
+Extract the essential biomedical keywords from the research question. 
+Include all important interventions, outcomes, populations, study types, biomarkers,
+mechanisms, and key terms. Remove stopwords, filler text, question phrasing, and
+yes/no/maybe answer options. Do NOT add new information or infer conclusions.
+
+# Format:
+Search query: <keyword_list>
+
+# Examples:
+## Question:
+Does metformin reduce cardiovascular events in type 2 diabetes patients?
+
+## Response:
+Search query: metformin cardiovascular events type 2 diabetes patients
+
+## Question:
+Do statins increase the risk of dementia in older adults?
+
+## Response:
+Search query: statins dementia risk older adults
+
+## Question:
+Is higher-dose vitamin D supplementation more effective for bone health in postmenopausal women?
+
+## Response:
+Search query: high dose vitamin D supplementation bone health postmenopausal women
+
+
+## Question:
+{question}
+
+## Response:
+Search query: """
+    else:
+        return f"""
 # Instruction:
 Extract the essential medical keywords from the question. 
 Include all important entities, symptoms, signs, lab abnormalities, imaging findings,
@@ -341,12 +591,57 @@ Search query: smoker chronic cough digital clubbing cavitary upper lobe lung les
 Search query: """
 
 
-def format_query_rewrite_par(question: str) -> str:
+def format_query_rewrite_par(question: str, dataset_type: str = "pubmedqa") -> str:
     """
     PAR - Pseudo-Answer Rewrite (Few-shot)
-    Include likely diagnosis/answer terms in search query.
+    Include likely answer/outcome terms in search query.
+    
+    Args:
+        question: Research question to rewrite
+        dataset_type: "medqa" or "pubmedqa"
     """
-    return f"""
+    if dataset_type == "pubmedqa":
+        return f"""
+# Instruction:
+Generate a biomedical research-informed search query that includes **likely answer directions or outcome terms**, 
+based on the research question. 
+You may make a brief, evidence-based guess at the likely answer (yes/no/maybe direction) or key outcomes, 
+but do NOT add unrelated facts or invent missing data. 
+The goal is to create a search query that includes:
+- key interventions and populations
+- important outcomes or endpoints
+- AND plausible answer directions or related mechanisms
+
+# Format:
+Search query: <query_with_likely_answer_terms>
+
+# Examples:
+## Question:
+Does metformin reduce cardiovascular events in type 2 diabetes patients?
+
+## Response:
+Search query: metformin cardiovascular protection reduction MACE type 2 diabetes cardiovascular events prevention
+
+## Question:
+Do statins increase the risk of dementia in older adults?
+
+## Response:
+Search query: statins dementia risk association cognitive decline older adults no association null finding
+
+## Question:
+Is higher-dose vitamin D supplementation more effective for bone health in postmenopausal women?
+
+## Response:
+Search query: high dose vitamin D bone mineral density BMD postmenopausal women effectiveness uncertain mixed results
+
+
+## Question:
+{question}
+
+## Response:
+Search query: """
+    else:
+        return f"""
 # Instruction:
 Generate a medically-informed search query that includes **likely diagnoses or answer terms**, 
 based on the clinical information in the question. 

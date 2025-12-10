@@ -23,8 +23,8 @@ augmentations:
   reflection: []
 
 # Dataset
-dataset: "eval_datasets/medqa_test.jsonl"
+dataset: "eval_datasets/pubmedqa_test.jsonl"
 max_samples: null  # null (not None) in YAML, or omit this line to load all samples
-batch_size: 512  # Batch size for inference (higher = faster but more memory)
+batch_size: 256  # Batch size for inference (higher = faster but more memory)
 verbose: true  # Print detailed logs (prompts, documents, predictions)
 output_path: "predictions/baseline_llm"

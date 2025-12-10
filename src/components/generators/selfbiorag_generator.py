@@ -191,7 +191,6 @@ class SelfBioRAGGenerator(Generator):
 
         # Add context with retrieval token if provided
         # Add context section
-        prompt_parts.append(f"\n# Now answer the following question.\n")
         prompt_parts.append(f"\n## Context:\n")
 
         if context:

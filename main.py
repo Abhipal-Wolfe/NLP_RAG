@@ -3,7 +3,7 @@
 import gc
 from src.core.config_loader import load_config, build_components
 from src.data import DatasetLoader
-from src.prompts import format_question_with_options, clean_answer, extract_answer_part
+from src.prompts import format_question_with_options, clean_answer, extract_answer_part, is_pubmedqa_format
 from src.utils import save_results
 from src.augmentations.loader import load_augmentations, print_loaded_augmentations
 from tqdm import tqdm
