@@ -24,8 +24,8 @@ augmentations:
   reflection: []
 
 # Dataset
-dataset: "eval_datasets/medqa_test.jsonl"
+dataset: "eval_datasets/pubmedqa_test.jsonl"
 max_samples: null
-batch_size: 512
+batch_size: 256
 verbose: true
 output_path: "predictions/baseline_llm_cot"

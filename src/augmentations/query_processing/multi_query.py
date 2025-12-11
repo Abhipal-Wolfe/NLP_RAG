@@ -75,13 +75,16 @@ def generate_rewritten_queries(
         "par": format_query_rewrite_par,
     }
     
+    # Get dataset_type from generator if available (default to PubMedQA)
+    dataset_type = getattr(generator, "dataset_type", "pubmedqa") if generator else "pubmedqa"
+    
     for strategy in strategies:
         if strategy not in strategy_prompts:
             continue
             
         prompt_fn = strategy_prompts[strategy]
         strategy_name = QUERY_REWRITE_STRATEGIES[strategy][0]
-        prompt = prompt_fn(query_for_rewrite)  # Use query WITHOUT options
+        prompt = prompt_fn(query_for_rewrite, dataset_type=dataset_type)  # Use query WITHOUT options
         
         if verbose:
             print(f"\n  " + "="*70)
